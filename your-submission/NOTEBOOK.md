@@ -725,6 +725,70 @@ Freeze Sarvam-1 as the second tokenizer for the final A3 comparison.
 
 Evaluate GPT-2 and Sarvam-1 on the complete 997-sentence-per-language A1 FLORES+ corpus using the corrected preprocessing and the final denominator set.
 
+## A3-0 — Legacy Method Reproduction
+
+### Hypothesis
+
+Before correcting the A3 methodology, reproduce the original `fertility.py` calculation on the complete aligned A1 FLORES+ corpus to establish an exact full-corpus before-state.
+
+### Experiment
+
+Created:
+
+`your-submission/partA/A3_corrected_analysis/legacy_reproduction.py`
+
+The script applies the original methodology:
+
+* NFC normalization
+* lowercasing
+* `line.split(" ")`
+* `len(line)` for the character denominator
+* arithmetic mean of per-line ratios
+* `add_special_tokens=False`
+
+Evaluated GPT-2 and the selected Sarvam-1 tokenizer on all 997 sentences in each of English, Hindi, Kannada, and Tamil.
+
+Command:
+
+`python your-submission\partA\A3_corrected_analysis\legacy_reproduction.py`
+
+### Result
+
+GPT-2:
+
+* English fertility: 1.282531
+* Hindi fertility: 7.823186
+* Kannada fertility: 22.148288
+* Tamil fertility: 24.733182
+
+Relative to English:
+
+* Hindi: 6.099802x
+* Kannada: 17.269202x
+* Tamil: 19.284665x
+
+Sarvam-1:
+
+* English fertility: 1.460539
+* Hindi fertility: 1.400991
+* Kannada fertility: 2.348439
+* Tamil fertility: 2.150157
+
+Relative to English:
+
+* Hindi: 0.959229x
+* Kannada: 1.607927x
+* Tamil: 1.472167x
+
+### Interpretation
+
+The legacy methodology reproduces a large GPT-2 Indic token-workload gap on the complete A1 corpus.
+
+However, these fertility values are not treated as direct serving-cost multipliers because A2 identified problems with the lowercasing step, literal `split(" ")` denominator, and language-dependent denominator interpretation.
+
+### Revision / Next Step
+
+Use the same full aligned corpus for the corrected A3 analysis so that the effect of the methodological changes can be measured against this explicit before-state.
 
 
 
