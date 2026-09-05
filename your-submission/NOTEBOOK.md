@@ -437,4 +437,60 @@ The experiment does not establish that tokens per sentence is universally the co
 
 Treat denominator choice as the leading conceptual issue in the v0 analysis. Perform one final paired sentence-level consistency check on the aligned corpus to strengthen the evidence for the conceptual conclusion. Then use the validated denominator alternatives as inputs to the A3 corrected analysis with a second tokenizer.
 
+## 2026-09-05 — A2 Experiment 8: paired sentence-level workload check
+
+### Hypothesis
+
+The denominator problem identified in the aligned-corpus analysis should remain visible when token workload is compared sentence-by-sentence across the same parallel content. If the result were only an artifact of corpus-level aggregation, paired sentence ratios would give a substantially different conclusion.
+
+### Experiment
+
+For each of the 997 FLORES+ sentence IDs, the target-language token count was divided by the corresponding English token count.
+
+The tokenizer and preprocessing were held constant:
+
+* GPT-2 via `tiktoken`
+* NFC normalization
+* lowercasing
+* original v0 whitespace behavior
+
+Two summaries were compared:
+
+1. Mean of the 997 paired target/English token ratios.
+2. Corpus-level target-token total divided by English-token total.
+
+The distribution of paired ratios was also summarized using the median, minimum, maximum, and standard deviation.
+
+Command:
+
+```text
+python your-submission\partA\A2_audit\experiments\exp08_paired_workload.py
+```
+
+### Result
+
+| Language | Mean paired ratio | Median paired ratio | Min ratio |  Max ratio | Std. dev. | Corpus-level ratio |
+| -------- | ----------------: | ------------------: | --------: | ---------: | --------: | -----------------: |
+| Hindi    |         7.290745x |           7.153846x | 4.064516x | 12.142857x |  1.426133 |          7.186170x |
+| Kannada  |        13.317866x |          13.086957x | 7.193548x | 24.928571x |  2.621160 |         13.103162x |
+| Tamil    |        15.154565x |          14.944444x | 5.794118x | 28.500000x |  2.975863 |         14.878221x |
+
+The paired means and corpus-level ratios were close for all three target languages. The paired ratios nevertheless showed substantial sentence-level variation.
+
+### Interpretation
+
+The aligned-content workload comparison is not explained by a single corpus-level aggregation artifact. Sentence-level paired ratios and corpus-level target/English token ratios lead to the same qualitative conclusion: Hindi, Kannada, and Tamil require substantially more model tokens than English for the corresponding FLORES+ content under the GPT-2 tokenizer.
+
+The paired-ratio distributions also show that the workload multiplier varies across individual sentences. Hindi ranges from 4.06x to 12.14x, Kannada from 7.19x to 24.93x, and Tamil from 5.79x to 28.50x.
+
+This strengthens the conceptual finding that whitespace-word normalization is not a sufficient cross-language workload denominator for a routing-and-cost decision.
+
+This experiment does not establish that the paired target/English token ratio is universally the correct production metric. That final decision will be made in A3 after comparing at least two tokenizers and multiple denominator choices.
+
+### Revision / next step
+
+Close the A2 conceptual investigation. Preserve the denominator experiments as evidence and move to A3, where the corrected analysis will compare two tokenizers on the fixed A1 corpus and determine the single operational metric for routing and cost.
+
+
+
 
