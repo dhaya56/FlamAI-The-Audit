@@ -489,7 +489,64 @@ This experiment does not establish that the paired target/English token ratio is
 
 ### Revision / next step
 
-Close the A2 conceptual investigation. Preserve the denominator experiments as evidence and move to A3, where the corrected analysis will compare two tokenizers on the fixed A1 corpus and determine the single operational metric for routing and cost.
+The paired sentence-level check strengthens the denominator finding: the target-to-English workload ratios remain consistent when examined both sentence-by-sentence and at corpus level.
+
+After this check, the A2 conceptual investigation was considered complete. The next step was to verify the suspicious-looking `random.seed(1337)` statement as a harmless item required by the A2 rubric, without modifying the original starter file.
+
+Following that final check, consolidate the A2 findings and move to A3, where the corrected analysis will compare two tokenizers on the fixed A1 corpus using multiple denominator definitions and determine the single operational metric for routing and cost.
+
+## 2026-09-05 — A2 Experiment 9: unused random seed
+
+### Hypothesis
+
+The `random.seed(1337)` statement at the top of `fertility.py` appears suspicious because the script imports `random` and seeds it, but the tokenizer benchmark may not use randomness anywhere in the computation.
+
+### Experiment
+
+First, the original `fertility.py` was executed twice with the same inputs. Both runs produced identical output.
+
+A second controlled experiment created a temporary copy of `fertility.py` with only the `random.seed(1337)` statement removed. The original script and temporary copy were then run with exactly the same command and inputs.
+
+Command:
+
+```text id="9c7v1j"
+python your-submission\partA\A2_audit\experiments\exp09_random_seed.py
+```
+
+### Result
+
+Original script with seed:
+
+```text id="5q8z3x"
+eng = 1.27
+hin = 7.45
+ratio = 5.89x
+```
+
+Temporary copy without seed:
+
+```text id="r1nnb8"
+eng = 1.27
+hin = 7.45
+ratio = 5.89x
+```
+
+The complete outputs were identical:
+
+```text
+outputs_identical: True
+```
+
+### Interpretation
+
+The random seed is unused by the benchmark computation. Removing it from a temporary copy does not change any reported tokenizer result.
+
+Therefore, this statement is suspicious-looking but harmless for this benchmark. It should not be reported as a numerical bug.
+
+### Revision / next step
+
+The A2 implementation audit is now complete. The remaining work is to consolidate the evidence into the final A2 findings and then perform the corrected A3 tokenizer comparison.
+
 
 
 
