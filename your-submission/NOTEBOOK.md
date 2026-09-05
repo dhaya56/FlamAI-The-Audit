@@ -547,6 +547,77 @@ Therefore, this statement is suspicious-looking but harmless for this benchmark.
 
 The A2 implementation audit is now complete. The remaining work is to consolidate the evidence into the final A2 findings and then perform the corrected A3 tokenizer comparison.
 
+## A3 — Tokenizer Candidate Access Screening
+
+### Hypothesis
+
+Before performing the corrected A3 comparison, screen a predefined set of multilingual/Indic-aware tokenizer candidates for local reproducibility across the same four languages used in A1: English, Hindi, Kannada, and Tamil.
+
+GPT-2 is retained as the legacy baseline because it is the tokenizer used by the starter audit. The screening is intended to determine which additional tokenizer candidates can be evaluated reproducibly; it is not intended to declare a tokenizer winner from a one-sentence sanity check.
+
+### Experiment
+
+Created:
+
+`your-submission/partA/A3_corrected_analysis/candidate_screen/candidate_access_test.py`
+
+The script attempts to load each candidate using Hugging Face `AutoTokenizer` and encode one fixed sanity-check sentence in each of the four A1 languages with:
+
+`add_special_tokens=False`
+
+Candidate pool tested:
+
+* GPT-2 — `gpt2`
+* IndicBERTv2-SS — `ai4bharat/IndicBERTv2-SS`
+* IndicTrans2 — `ai4bharat/indictrans2-en-indic-1B`
+* Sarvam-1 — `sarvamai/sarvam-1`
+* Qwen2.5-7B — `Qwen/Qwen2.5-7B`
+* Gemma-2-9B — `google/gemma-2-9b`
+* XLM-R — `FacebookAI/xlm-roberta-base`
+
+Environment:
+
+* Python 3.13.5
+* Transformers 5.16.1
+* SentencePiece installed
+
+Command:
+
+`python your-submission\partA\A3_corrected_analysis\candidate_screen\candidate_access_test.py`
+
+### Result
+
+Five candidates loaded successfully and encoded all four languages:
+
+| Candidate      | Vocab size | English | Hindi | Kannada | Tamil |
+| -------------- | ---------: | ------: | ----: | ------: | ----: |
+| GPT-2          |     50,257 |      10 |    66 |     144 |   152 |
+| IndicBERTv2-SS |    200,000 |      10 |     9 |      39 |    50 |
+| Sarvam-1       |     68,096 |      10 |     9 |       9 |     9 |
+| Qwen2.5-7B     |    151,665 |      10 |    38 |      72 |    59 |
+| XLM-R          |    250,002 |      11 |    10 |      10 |    11 |
+
+IndicTrans2 was first rejected because its repository required `trust_remote_code=True`. A controlled retry with `trust_remote_code=True` progressed further but failed with:
+
+`ModuleNotFoundError: No module named 'transformers.onnx'`
+
+Therefore, IndicTrans2 was not reproducibly loadable in the frozen environment used for this audit.
+
+Gemma-2-9B could not be loaded because the Hugging Face repository is gated and the current account does not have access.
+
+### Interpretation
+
+The one-sentence token counts are only an access and encoding sanity check. They are not used to rank the candidates or select the final A3 tokenizer because the sample is too small to support such a conclusion.
+
+The five reproducibly loadable candidates were retained for the next screening experiment.
+
+### Revision / Next Step
+
+Do not select the final A3 comparator yet.
+
+Next, evaluate the frozen five-candidate pool on a deterministic 100-sentence-per-language subset of the aligned A1 FLORES+ corpus using identical NFC preprocessing and multiple workload denominators. Use those empirical results to select the final multilingual/Indic-aware comparator for the complete A3 analysis.
+
+
 
 
 
