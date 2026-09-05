@@ -203,3 +203,48 @@ Therefore, this experiment does not provide evidence that the aggregation method
 ### Revision / next step
 
 Do not present the aggregation choice as a major confirmed flaw based on this experiment. Continue the audit by investigating the definition of the denominator and whether tokens-per-word is an appropriate cross-language metric for a routing-and-cost decision.
+
+## 2026-09-05 — A2 Experiment 3: denominator sensitivity — dead end and revision
+
+### Hypothesis
+
+Changing the denominator from words to sentences may materially change the reported English-to-Hindi tokenizer ratio, because a whitespace-separated word is not necessarily a comparable unit across languages.
+
+### Experiment
+
+The original tokenizer and v0-style per-line averaging were retained. The denominator was changed from words to one sentence per observation.
+
+Command:
+
+```text id="e7yq1k"
+python your-submission\partA\A2_audit\experiments\exp03_denominator.py
+```
+
+### Result
+
+```text id="8chqm5"
+English tokens/word      = 1.265206
+Hindi tokens/word        = 7.448452
+
+English tokens/sentence = 9.900000
+Hindi tokens/sentence   = 45.900000
+
+Word-normalized ratio    = 5.887148x
+Sentence-normalized ratio = 4.636364x
+Relative change           = -21.25%
+```
+
+### Dead end / validity issue
+
+Although the denominator change produced a large difference, this experiment does not establish the correct cross-language metric. The starter English and Hindi files are only smoke-test corpora and are not consistently aligned sentence-by-sentence. In addition, the earlier aggregation experiment showed that changing aggregation can itself affect ratios, so denominator experiments must isolate aggregation and denominator choices explicitly.
+
+Therefore the 21.25% change is recorded as an observation, not as evidence that tokens-per-sentence is the correct production metric.
+
+### Revision
+
+Test denominator choice on the properly aligned A1 evaluation corpus, where the same sentence IDs represent corresponding multilingual content. Keep tokenizer, aggregation, and preprocessing fixed while changing only the denominator.
+
+### Next experiment
+
+Compare tokens per parallel sentence with tokens per whitespace word on the fixed FLORES+ evaluation set. Use the result to determine what the denominator should hold constant for a routing-and-cost decision.
+
