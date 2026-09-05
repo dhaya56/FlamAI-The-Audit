@@ -111,3 +111,41 @@ The selected corpus satisfies the A1 language and size requirements and has expe
 ### Revision / next step
 
 Use this corpus as the fixed evaluation set for the corrected tokenizer analysis. Do not change the corpus based on tokenizer results. Next, audit the original `fertility.py` and its metrics using isolated experiments against the verified v0 baseline.
+
+## 2026-09-05 — A2 Experiment 1: repeated-whitespace handling
+
+### Hypothesis
+
+The expression `line.split(" ")` in `fertility.py` may incorrectly count empty fields as words when consecutive spaces occur, biasing the fertility metric.
+
+### Experiment
+
+The tokenizer, normalization, per-line averaging, and input corpora were held constant. Only the word-count operation was changed:
+
+* Original: `line.split(" ")`
+* Comparison: `line.split()`
+
+Command:
+
+```text
+python your-submission\partA\A2_audit\experiments\exp01_whitespace.py
+```
+
+### Result
+
+| Language | Original `split(" ")` | `split()` | Absolute delta | Relative delta |
+| -------- | --------------------: | --------: | -------------: | -------------: |
+| English  |              1.265206 |  1.283063 |      +0.017857 |         +1.41% |
+| Hindi    |              7.448452 |  7.598452 |      +0.150000 |         +2.01% |
+
+A separate controlled sentence test showed that the difference occurs only when consecutive whitespace is present; single-space input produced identical fertility.
+
+### Interpretation
+
+The suspected implementation issue is confirmed. `split(" ")` creates an empty field for consecutive spaces, increasing the word denominator and therefore lowering tokens-per-word fertility. On the supplied starter corpora, this causes a 1.41% downward distortion for English and a 2.01% downward distortion for Hindi.
+
+The bug is real but small relative to the overall reported Hindi-versus-English fertility gap, so it does not by itself explain the large 5.89× ratio.
+
+### Revision / next step
+
+Do not treat the whitespace bug as the primary explanation for the report's conclusion. Investigate the metric definition and other implementation choices independently. The next experiment should test whether the way the script aggregates per-line fertility changes the cross-language result.
