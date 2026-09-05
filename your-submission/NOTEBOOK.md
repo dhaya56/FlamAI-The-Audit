@@ -293,3 +293,47 @@ The implementation is intentional—the source comment says lowercasing is used 
 
 Treat lowercasing as a confirmed benchmark methodology issue rather than assuming it is harmless. Continue auditing the character denominator and other transformations before finalizing the A2 classification.
 
+## 2026-09-05 — A2 Experiment 5: character-denominator sensitivity
+
+### Hypothesis
+
+The `tok/char` metric may depend strongly on how a "character" is defined. The source script uses Python `len(line)`, which counts Unicode code points. A cross-script comparison may change materially when using other reasonable Unicode units.
+
+### Experiment
+
+The tokenizer, text normalization, lowercasing, word handling, and per-line averaging were held constant. Only the character denominator was changed:
+
+1. Unicode code points: `len(line)`
+2. Unicode grapheme clusters: `len(regex.findall(r"\X", line))`
+3. UTF-8 bytes: `len(line.encode("utf-8"))`
+
+Command:
+
+```text id="5n3smd"
+python your-submission\partA\A2_audit\experiments\exp05_char_denominator.py
+```
+
+### Result
+
+| Denominator         | English tok/denominator | Hindi tok/denominator | Hindi/English ratio |
+| ------------------- | ----------------------: | --------------------: | ------------------: |
+| Unicode code points |                0.225636 |              1.579108 |           6.998478× |
+| Grapheme clusters   |                0.225636 |              2.449732 |          10.857013× |
+| UTF-8 bytes         |                0.225636 |              0.598992 |           2.654683× |
+
+Relative to the code-point ratio:
+
+* Grapheme ratio: +55.13%
+* UTF-8 byte ratio: -62.07%
+
+### Interpretation
+
+The `tok/char` comparison is highly sensitive to the definition of "character" for non-Latin scripts. The same token counts produce materially different cross-language ratios under reasonable denominator definitions.
+
+Therefore, the `tok/char` result should not be presented as an independent confirmation of the `tok/word` result. The experiment demonstrates denominator sensitivity, but does not by itself establish which denominator is the correct production cost metric.
+
+### Revision / next step
+
+Retain this as evidence against treating `tok/char` as a robust independent confirmation. Next, test the suspicious Unicode NFC normalization step for material effect, then evaluate denominator choice on the properly aligned A1 corpus.
+
+
