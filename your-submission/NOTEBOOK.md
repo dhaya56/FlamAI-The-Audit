@@ -790,6 +790,100 @@ However, these fertility values are not treated as direct serving-cost multiplie
 
 Use the same full aligned corpus for the corrected A3 analysis so that the effect of the methodological changes can be measured against this explicit before-state.
 
+## A3-1 / A3-2 — Corrected Full-Corpus Analysis and Direct Workload Comparison
+
+### Hypothesis
+
+After correcting the methodological issues identified in A2, the tokenizer comparison should still show whether an Indic-aware tokenizer materially changes the actual model-token workload for the same multilingual content.
+
+### Experiment
+
+Evaluated GPT-2 and the selected Sarvam-1 tokenizer on all 997 aligned FLORES+ sentences for each of English, Hindi, Kannada, and Tamil.
+
+Command:
+
+`python your-submission\partA\A3_corrected_analysis\corrected_comparison.py`
+
+Corrected preprocessing:
+
+* NFC normalization only
+* original case preserved
+* internal whitespace preserved
+* no lowercasing
+* `split()` for the whitespace-word denominator
+* Unicode grapheme counting
+* UTF-8 byte counting
+* `add_special_tokens=False`
+
+### Result
+
+GPT-2 token workload:
+
+* English: 25,741
+* Hindi: 191,828
+* Kannada: 349,772
+* Tamil: 397,163
+
+Sarvam-1 token workload:
+
+* English: 29,915
+* Hindi: 34,206
+* Kannada: 37,225
+* Tamil: 34,539
+
+Relative to English, GPT-2 produced 7.452236x, 13.588128x, and 15.429199x the token workload for Hindi, Kannada, and Tamil respectively.
+
+Sarvam-1 produced 1.143440x, 1.244359x, and 1.154571x respectively.
+
+### Direct Workload Experiment
+
+Command:
+
+`python your-submission\partA\A3_corrected_analysis\compare_token_reduction.py`
+
+For the same aligned Indic content:
+
+* Hindi: 82.17% fewer tokens with Sarvam-1
+* Kannada: 89.36% fewer tokens
+* Tamil: 91.30% fewer tokens
+
+Combined Hindi + Kannada + Tamil:
+
+* GPT-2: 938,763 tokens
+* Sarvam-1: 105,970 tokens
+* Reduction: 88.71%
+
+### Legacy → Corrected Revision
+
+Correcting the methodology changed the GPT-2 `tokens/word` value by:
+
+* English: -4.22%
+* Hindi: -0.35%
+* Kannada: +2.35%
+* Tamil: -0.47%
+
+Sarvam-1 changed by:
+
+* English: -2.25%
+* Hindi: -0.78%
+* Kannada: +2.73%
+* Tamil: -0.44%
+
+The qualitative tokenizer comparison therefore survives the methodological corrections.
+
+### Interpretation
+
+The primary routing/cost metric is direct model-token workload on equivalent aligned content, represented by total tokens or tokens per aligned sentence.
+
+`Tokens/word` remains useful as a diagnostic normalization but is not treated as a direct cost multiplier because words are not a language-neutral workload unit.
+
+Sarvam-1 has a clear Indic-language token-workload advantage in this evaluation, but uses 16.22% more tokens than GPT-2 on the evaluated English sentences. Therefore the evidence supports language-specific routing rather than a universal “Sarvam is cheaper” conclusion.
+
+### Revision / Next Step
+
+A3 quantitative comparison is complete.
+
+Next, prepare the A4 one-page memo using the corrected headline numbers, routing recommendation, principal caveat, and one production metric to monitor.
 
 
 
