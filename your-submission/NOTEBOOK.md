@@ -617,6 +617,115 @@ Do not select the final A3 comparator yet.
 
 Next, evaluate the frozen five-candidate pool on a deterministic 100-sentence-per-language subset of the aligned A1 FLORES+ corpus using identical NFC preprocessing and multiple workload denominators. Use those empirical results to select the final multilingual/Indic-aware comparator for the complete A3 analysis.
 
+## A3 — 100-Sentence Tokenizer Candidate Screen
+
+### Hypothesis
+
+The tokenizer candidate that appears most suitable for the final A3 comparison should remain strong when evaluated on a larger aligned sample and under more than one denominator definition, rather than being selected from a one-sentence sanity check.
+
+### Experiment
+
+Evaluated the five reproducibly loadable tokenizer candidates retained after the access screen:
+
+* GPT-2
+* IndicBERTv2-SS
+* Sarvam-1
+* Qwen2.5-7B
+* XLM-R
+
+Used the deterministic first 100 aligned FLORES+ sentence IDs for each of English, Hindi, Kannada, and Tamil.
+
+Command:
+
+`python your-submission\partA\A3_corrected_analysis\candidate_screen\candidate_screen_benchmark.py`
+
+Preprocessing preserved the original text, removed line endings only, applied no lowercasing, and disabled special tokens.
+
+Measured:
+
+* tokens/sentence
+* tokens/whitespace word
+* tokens/grapheme
+* tokens/UTF-8 byte
+* relative total token workload versus English
+
+### Result
+
+GPT-2 produced the highest Indic token workload by a large margin:
+
+* Hindi: 7.312x English
+* Kannada: 13.218x English
+* Tamil: 15.072x English
+
+Sarvam-1 produced:
+
+* Hindi: 1.103x
+* Kannada: 1.248x
+* Tamil: 1.149x
+
+XLM-R produced:
+
+* Hindi: 1.279x
+* Kannada: 1.381x
+* Tamil: 1.371x
+
+IndicBERTv2-SS and Qwen2.5-7B were intermediate.
+
+### Interpretation
+
+The 100-sentence screen confirms that tokenizer choice materially changes Indic token workload and that GPT-2 has substantially higher Indic inflation than the other screened candidates.
+
+Sarvam-1 and XLM-R are the strongest candidates from this screen, but no final tokenizer was selected yet.
+
+### Revision / Next Step
+
+Before final selection, compare the candidates using aggregated `tokens/word` and `tokens/UTF-8 byte` measurements.
+
+Use the same raw screening results for this analysis rather than running another corpus experiment.
+
+## A3 — Candidate Ranking and Final Comparator Selection
+
+### Hypothesis
+
+If a tokenizer is genuinely preferable for multilingual/Indic workloads, it should remain competitive across multiple denominator definitions rather than winning under only one metric.
+
+### Experiment
+
+Used the raw 100-sentence-per-language screening results and aggregated Hindi, Kannada, and Tamil using a simple mean.
+
+Command:
+
+`python your-submission\partA\A3_corrected_analysis\candidate_screen\analyze_screen.py`
+
+Primary criterion: lower mean `tokens/word`.
+
+Secondary criterion: lower mean `tokens/UTF-8 byte`.
+
+### Result
+
+| Candidate      | Mean tok/word | Mean tok/byte | Mean Indic vs English |
+| -------------- | ------------: | ------------: | --------------------: |
+| Sarvam-1       |        2.0268 |        0.1036 |               1.1666x |
+| XLM-R          |        2.1531 |        0.1101 |               1.3436x |
+| IndicBERTv2-SS |        5.1211 |        0.2347 |               3.0638x |
+| Qwen2.5-7B     |        8.6179 |        0.4270 |               5.6332x |
+| GPT-2          |       17.7657 |        0.8540 |              11.8671x |
+
+### Interpretation
+
+Sarvam-1 ranks first under both predefined denominator criteria. XLM-R ranks second under both.
+
+The final A3 multilingual/Indic-aware comparator is therefore selected as Sarvam-1.
+
+This is a screening-based selection, not a claim that Sarvam-1 is globally optimal.
+
+### Revision / Next Step
+
+Freeze Sarvam-1 as the second tokenizer for the final A3 comparison.
+
+Evaluate GPT-2 and Sarvam-1 on the complete 997-sentence-per-language A1 FLORES+ corpus using the corrected preprocessing and the final denominator set.
+
+
 
 
 
