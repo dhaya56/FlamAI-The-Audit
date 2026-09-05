@@ -885,6 +885,41 @@ A3 quantitative comparison is complete.
 
 Next, prepare the A4 one-page memo using the corrected headline numbers, routing recommendation, principal caveat, and one production metric to monitor.
 
+## A4 — Recommendation Memo
+
+### Hypothesis / Decision
+
+Use the corrected A3 token-workload evidence to produce a production-oriented routing recommendation.
+
+### Evidence Used
+
+The recommendation is based on the complete aligned FLORES+ comparison of GPT-2 and Sarvam-1:
+
+* Hindi: 82.17% fewer Sarvam-1 tokens
+* Kannada: 89.36% fewer
+* Tamil: 91.30% fewer
+* Combined Hindi + Kannada + Tamil: 88.71% fewer tokens
+* English: Sarvam-1 uses 16.22% more tokens than GPT-2
+
+### Recommendation
+
+Use language-aware routing: route Hindi, Kannada, and Tamil traffic to Sarvam-1 while retaining GPT-2 for English, subject to production quality validation.
+
+The routing/cost decision is based primarily on direct model-token workload for equivalent aligned content rather than tokens per whitespace-defined word.
+
+### Biggest Caveat
+
+The experiment measures tokenizer token workload, not end-to-end latency, monetary serving cost, or task-quality parity. Lower token counts therefore do not by themselves prove lower production cost or equivalent model quality.
+
+### Production Metric
+
+Monitor p95 input tokens per request by language and tokenizer route.
+
+This directly tests whether live traffic follows the token-workload assumptions established by the FLORES+ evaluation.
+
+### Revision / Next Step
+
+Part A is complete after the A4 memo is committed. Merge the completed Part-A branch into `main` before beginning Part B.
 
 
 
