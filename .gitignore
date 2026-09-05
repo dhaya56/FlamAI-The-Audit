@@ -16,3 +16,6 @@ __pycache__/
 
 # Logs
 *.log
+
+# Locally materialized gated evaluation corpus
+your-submission/partA/A1_corpus/eval_corpus/
