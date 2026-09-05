@@ -149,3 +149,57 @@ The bug is real but small relative to the overall reported Hindi-versus-English 
 ### Revision / next step
 
 Do not treat the whitespace bug as the primary explanation for the report's conclusion. Investigate the metric definition and other implementation choices independently. The next experiment should test whether the way the script aggregates per-line fertility changes the cross-language result.
+
+## 2026-09-05 — A2 Experiment 2: aggregation method
+
+### Hypothesis
+
+The existing script computes a per-line fertility ratio and then averages those ratios. A corpus-level ratio may produce a materially different cross-language comparison.
+
+### Experiment
+
+The tokenizer, corpus, normalization, and word-count definition were held constant. Only the aggregation method was changed.
+
+Original aggregation:
+
+```text
+mean(T_i / W_i)
+```
+
+Comparison:
+
+```text
+sum(T_i) / sum(W_i)
+```
+
+Command:
+
+```text id="qz7vgo"
+python your-submission\partA\A2_audit\experiments\exp02_aggregation.py
+```
+
+### Result
+
+| Language | Per-line average | Corpus-level ratio | Relative change |
+| -------- | ---------------: | -----------------: | --------------: |
+| English  |         1.265206 |           1.253165 |          -0.95% |
+| Hindi    |         7.448452 |           7.403226 |          -0.61% |
+
+Cross-language ratio:
+
+| Method             | Hindi / English |
+| ------------------ | --------------: |
+| Per-line average   |       5.887148× |
+| Corpus-level ratio |       5.907625× |
+
+The cross-language ratio changes by only **+0.35%**.
+
+### Interpretation
+
+The alternative aggregation method changes the individual language fertility estimates slightly, but it produces only a 0.35% change in the English-to-Hindi comparison on the supplied corpus.
+
+Therefore, this experiment does not provide evidence that the aggregation method materially explains the headline 5.89× conclusion.
+
+### Revision / next step
+
+Do not present the aggregation choice as a major confirmed flaw based on this experiment. Continue the audit by investigating the definition of the denominator and whether tokens-per-word is an appropriate cross-language metric for a routing-and-cost decision.
