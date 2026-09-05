@@ -336,4 +336,45 @@ Therefore, the `tok/char` result should not be presented as an independent confi
 
 Retain this as evidence against treating `tok/char` as a robust independent confirmation. Next, test the suspicious Unicode NFC normalization step for material effect, then evaluate denominator choice on the properly aligned A1 corpus.
 
+## 2026-09-05 — A2 Experiment 6: NFC normalization
+
+### Hypothesis
+
+The explicit Unicode NFC normalization in `fertility.py` may alter the text representation seen by the tokenizer and therefore change fertility measurements.
+
+### Experiment
+
+The tokenizer, corpus, lowercasing, whitespace handling, character counting, and aggregation were held constant. Only NFC normalization was toggled.
+
+Command:
+
+```text
+python your-submission\partA\A2_audit\experiments\exp06_nfc.py
+```
+
+### Result
+
+| Language | NFC fertility | Raw fertility | Relative change |
+| -------- | ------------: | ------------: | --------------: |
+| English  |      1.265206 |      1.265206 |           0.00% |
+| Hindi    |      7.448452 |      7.448452 |           0.00% |
+
+The `tok/char` values were also unchanged.
+
+Cross-language ratio:
+
+```text
+NFC  = 5.887148x
+Raw  = 5.887148x
+Change = 0.00%
+```
+
+### Interpretation
+
+NFC normalization produced no measurable change on the supplied starter corpus with the GPT-2 tokenizer. Therefore, although the normalization step may initially appear capable of affecting Unicode tokenization, this experiment provides no evidence that it distorts the reported numbers for this benchmark.
+
+### Revision / next step
+
+Do not classify NFC normalization as a bug based on this evidence. It remains a documented preprocessing choice. The next major task is to test the denominator question on the properly aligned A1 evaluation corpus, which is the strongest candidate for the conceptual problem identified in A2.
+
 
