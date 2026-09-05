@@ -242,9 +242,54 @@ Therefore the 21.25% change is recorded as an observation, not as evidence that 
 
 ### Revision
 
-Test denominator choice on the properly aligned A1 evaluation corpus, where the same sentence IDs represent corresponding multilingual content. Keep tokenizer, aggregation, and preprocessing fixed while changing only the denominator.
+The denominator appears capable of materially changing the reported cross-language ratio, but the starter corpus is not a consistently aligned multilingual evaluation set. Therefore the toy-corpus result cannot establish which denominator is appropriate for the final routing/cost decision.
+
+The next investigation was expanded to audit other transformations in `fertility.py` before making the final conceptual classification.
 
 ### Next experiment
 
-Compare tokens per parallel sentence with tokens per whitespace word on the fixed FLORES+ evaluation set. Use the result to determine what the denominator should hold constant for a routing-and-cost decision.
+First test whether preprocessing operations applied before tokenization, particularly forced lowercasing, create measurable asymmetric effects between English and Hindi.
+
+After completing the implementation audit, test denominator choice on the properly aligned A1 evaluation corpus, keeping tokenizer, aggregation, and preprocessing fixed while changing only the denominator. Use that experiment to determine what the denominator should hold constant for a routing-and-cost decision.
+
+## 2026-09-05 — A2 Experiment 4: forced lowercasing
+
+### Hypothesis
+
+The `line.lower()` operation may alter tokenizer fertility because casing is part of the input seen by a cased tokenizer. Because Hindi does not have the same case distinction, the preprocessing may affect English and Hindi asymmetrically.
+
+### Experiment
+
+The tokenizer, corpus, NFC normalization, whitespace handling, and per-line averaging were held constant. Only the lowercasing operation was changed.
+
+Command:
+
+```text
+python your-submission\partA\A2_audit\experiments\exp04_lowercase.py
+```
+
+### Result
+
+| Language          | With `.lower()` | Without `.lower()` | Relative change |
+| ----------------- | --------------: | -----------------: | --------------: |
+| English fertility |        1.265206 |           1.229329 |          -2.84% |
+| Hindi fertility   |        7.448452 |           7.448452 |           0.00% |
+
+Cross-language ratio:
+
+```text
+with lowercasing    = 5.887148x
+without lowercasing = 6.058958x
+relative change     = +2.92%
+```
+
+### Interpretation
+
+Forced lowercasing has a measurable asymmetric effect on the benchmark. English fertility changes by 2.84% while Hindi fertility is unchanged in the supplied corpus. Consequently, the Hindi/English fertility ratio changes by 2.92%.
+
+The implementation is intentional—the source comment says lowercasing is used so casing does not add noise—but the transformation changes the English input distribution while leaving Hindi unaffected. Therefore the preprocessing choice can bias the cross-language comparison.
+
+### Revision / next step
+
+Treat lowercasing as a confirmed benchmark methodology issue rather than assuming it is harmless. Continue auditing the character denominator and other transformations before finalizing the A2 classification.
 
