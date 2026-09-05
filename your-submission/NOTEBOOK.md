@@ -377,4 +377,64 @@ NFC normalization produced no measurable change on the supplied starter corpus w
 
 Do not classify NFC normalization as a bug based on this evidence. It remains a documented preprocessing choice. The next major task is to test the denominator question on the properly aligned A1 evaluation corpus, which is the strongest candidate for the conceptual problem identified in A2.
 
+## 2026-09-05 — A2 Experiment 7: denominator choice on aligned multilingual corpus
+
+### Hypothesis
+
+The v0 `tokens/word` metric may be conceptually unsuitable for cross-language routing and cost comparisons because a whitespace-separated word does not represent a controlled amount of underlying content across languages. A parallel-sentence denominator may produce a materially different estimate of relative token workload when the same underlying sentence content is held constant.
+
+### Experiment
+
+The fixed A1 FLORES+ `dev` corpus was used with the same 997 aligned sentence IDs for English, Hindi, Kannada, and Tamil.
+
+The tokenizer and tokenizer-side preprocessing were held constant:
+
+* GPT-2 via `tiktoken`
+* Unicode NFC normalization
+* lowercasing
+* original v0 whitespace definition
+* per-line averaging
+
+The experiment was deliberately narrowed to compare only:
+
+1. tokens per whitespace word
+2. tokens per parallel sentence
+
+This isolates the denominator question without simultaneously changing other metric definitions.
+
+Command:
+
+```text
+python your-submission\partA\A2_audit\experiments\exp07_aligned_denominators.py
+```
+
+### Result
+
+| Language | tokens/word | tokens/sentence |
+| -------- | ----------: | --------------: |
+| English  |    1.282531 |       26.776329 |
+| Hindi    |    7.823186 |      192.419258 |
+| Kannada  |   22.148288 |      350.854564 |
+| Tamil    |   24.733182 |      398.384152 |
+
+Relative to English:
+
+| Language | tokens/word ratio | tokens/sentence ratio |
+| -------- | ----------------: | --------------------: |
+| Hindi    |         6.099802× |             7.186170× |
+| Kannada  |        17.269202× |            13.103162× |
+| Tamil    |        19.284665× |            14.878221× |
+
+### Interpretation
+
+The relative language penalty changes substantially depending on the denominator. Hindi changes from 6.10× to 7.19×, Kannada from 17.27× to 13.10×, and Tamil from 19.28× to 14.88×.
+
+This supports the hypothesis that `tokens/word` is not a sufficient cross-language normalization for a routing-and-cost decision. A whitespace word is not a controlled unit of underlying content across languages, whereas aligned sentence IDs allow corresponding multilingual content to be compared.
+
+The experiment does not establish that tokens per sentence is universally the correct production metric. It establishes that denominator choice is consequential and that the v0 5.89× headline cannot be treated as a universal language-specific serving-cost multiplier.
+
+### Revision / next step
+
+Treat denominator choice as the leading conceptual issue in the v0 analysis. Perform one final paired sentence-level consistency check on the aligned corpus to strengthen the evidence for the conceptual conclusion. Then use the validated denominator alternatives as inputs to the A3 corrected analysis with a second tokenizer.
+
 
