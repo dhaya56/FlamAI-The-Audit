@@ -921,6 +921,485 @@ This directly tests whether live traffic follows the token-workload assumptions 
 
 Part A is complete after the A4 memo is committed. Merge the completed Part-A branch into `main` before beginning Part B.
 
+## B1 — KV-Cache Capacity Reconciliation
 
+### Hypothesis
 
+From the model specification alone, derive the KV-cache footprint per token and estimate how many complete 4096-token sequences the GPU can hold. Only after making that prediction, compare it with the benchmark log.
 
+### Experiment
+
+Created:
+
+`your-submission/partB/B1/b1_capacity_reconciliation.py`
+
+and:
+
+`your-submission/partB/B1/b1_capacity_reconciliation.md`
+
+Command:
+
+`python your-submission\partB\B1\b1_capacity_reconciliation.py`
+
+The calculation explicitly separates:
+
+1. Prediction from model specification alone
+2. Check against `bench_log.csv`
+3. Reconciled calculation
+
+The supplied `24 GB` GPU memory and `1.6 GB` non-KV overhead are treated as decimal GB (`1 GB = 10^9 bytes`) throughout the capacity calculation.
+
+### Stage 1 — Prediction from Model Spec Alone
+
+KV-cache bytes per token:
+
+`2(K,V) × 28 layers × 8 KV heads × 128 head_dim × 2 bytes(fp16) = 114,688 bytes/token`
+
+This is:
+
+`114,688 / 1024 = 112 KiB/token`
+
+One complete 4096-token sequence therefore requires:
+
+`114,688 × 4096 = 469,762,048 bytes = 448 MiB`
+
+Using the configured GPU budget:
+
+`24 GB × 0.92 = 22.08 GB`
+
+and subtracting only the stated non-KV overhead in the first pass:
+
+`22.08 − 1.6 = 20.48 GB`
+
+Initial capacity hypothesis:
+
+`20,480,000,000 / 469,762,048 = 43.597 sequences`
+
+Therefore the initial model-spec-only hypothesis was approximately **43.60 sequences**.
+
+### Stage 2 — Check Against Benchmark Log
+
+The relevant capacity-stress rows have:
+
+`prompt_len + gen_len = 3584 + 512 = 4096`
+
+Observed results:
+
+* Batch 24: `preempted_seqs = 0`, `kv_cache_util = 0.93`
+* Batch 32: `preempted_seqs = 7`, `kv_cache_util = 0.97`
+* Batch 48: `preempted_seqs = 23`, `kv_cache_util = 0.97`
+
+Inferred resident-sequence counts:
+
+`32 − 7 = 25`
+
+`48 − 23 = 25`
+
+The initial ~43.60 prediction therefore does not match the observed capacity behavior.
+
+### Stage 3 — Reconciled Calculation
+
+The missing allocation in the initial calculation was model-weight memory.
+
+For the 4.2B-parameter fp16 model:
+
+`4.2 × 10^9 × 2 = 8.4 × 10^9 bytes = 8.4 GB`
+
+Correct KV budget:
+
+`22.08 − 8.4 − 1.6 = 12.08 GB`
+
+Corrected capacity:
+
+`12,080,000,000 / 469,762,048 = 25.715 sequences`
+
+Therefore the reconciled capacity is approximately **25 concurrent 4096-token sequences**.
+
+This agrees with both capacity-stress rows:
+
+`32 − 7 = 25`
+
+`48 − 23 = 25`
+
+The reported KV utilization is also consistent: scaling the 24-sequence utilization gives approximately `0.93 × 25/24 = 0.969`, matching the observed `0.97`.
+
+### Interpretation
+
+The first-pass ~43.60-sequence result was a genuine incomplete memory-budget calculation because model weights had not been reserved.
+
+After accounting for model weights and the stated non-KV overhead, the model-spec prediction becomes approximately 25 sequences, which is independently supported by the benchmark log.
+
+### Revision / Next Step
+
+B1 capacity reconciliation is complete.
+
+Proceed to B2 using the long-context throughput rows, with particular attention to the relationship between `reported_tok_s`, `wall_clock_s`, `batch_size`, and the 3584-token prompt configuration.
+
+## B2 — Long-Context Throughput Anomaly
+
+### Initial Hypothesis
+
+The `prompt_len = 3584` long-context sweep should show increasing `reported_tok_s` as batch size increases, until some capacity or serving constraint causes the scaling behavior to break.
+
+The first analysis should identify any reversal from the data rather than assuming the location or cause of the anomaly.
+
+### Experiment 1 — Long-Context Sweep Inspection
+
+Created:
+
+`your-submission/partB/B2/b2_anomaly_analysis.py`
+
+Command:
+
+`python your-submission\partB\B2\b2_anomaly_analysis.py`
+
+Filtered the benchmark log to `prompt_len = 3584`.
+
+Observed `reported_tok_s`:
+
+* Batch 4: 565.4
+* Batch 8: 902.6
+* Batch 16: 1311.4
+* Batch 24: 1607.4
+* Batch 32: 1384.0
+* Batch 48: 1298.5
+
+The first throughput reversal is batch 24 → 32:
+
+`1607.4 → 1384.0 tok/s`
+
+which is a **13.90% decrease** despite the larger batch.
+
+A second reversal occurs from batch 32 → 48:
+
+`1384.0 → 1298.5 tok/s`
+
+which is a **6.18% decrease**.
+
+### Revision — Avoid Hard-Coded Conclusions
+
+The initial analysis script contained a hard-coded statement identifying the anomaly.
+
+That was revised because the experiment should **discover the throughput reversal from the benchmark data**, not be given the conclusion in advance.
+
+The script was changed to detect a reversal whenever a larger batch has lower `reported_tok_s` than the preceding batch.
+
+The revised script automatically identified:
+
+* first reversal: batch 24 → 32
+* second reversal: batch 32 → 48
+
+### Experiment 2 — Verify What `reported_tok_s` Measures
+
+The same B2 script independently reconstructed the reported throughput using:
+
+`batch_size × (prompt_len + gen_len) / wall_clock_s`
+
+For example, batch 24:
+
+`(24 × (3584 + 512)) / 61.16 = 1607.33 tok/s`
+
+reported value:
+
+`1607.4 tok/s`
+
+Similar agreement was observed for every row in the 3584-prompt sweep.
+
+Interpretation:
+
+`reported_tok_s` is effectively counting **prompt + generated tokens per wall-clock second**.
+
+This changed the interpretation of the throughput column: it should not be described as generated-token-only throughput or as goodput.
+
+### Experiment 3 — Mechanism Evidence
+
+The first reversal was examined by comparing the automatically selected pre-reversal and reversal rows.
+
+Batch 24:
+
+* `reported_tok_s = 1607.4`
+* `kv_cache_util = 0.93`
+* `preempted_seqs = 0`
+* `ttft_ms_p50 = 500.5 ms`
+* `e2e_ms_p95 = 69,221.3 ms`
+
+Batch 32:
+
+* `reported_tok_s = 1384.0`
+* `kv_cache_util = 0.97`
+* `preempted_seqs = 7`
+* `ttft_ms_p50 = 636.9 ms`
+* `e2e_ms_p95 = 97,465.7 ms`
+
+Changes from batch 24 to batch 32:
+
+* `reported_tok_s`: **-13.90%**
+* `kv_cache_util`: **0.93 → 0.97**
+* `preempted_seqs`: **0 → 7**
+* `ttft_ms_p50`: **+27.25%**
+* `e2e_ms_p95`: **+40.80%**
+
+The next row shows the deterioration continuing:
+
+Batch 48:
+
+* `reported_tok_s = 1298.5`
+* `kv_cache_util = 0.97`
+* `preempted_seqs = 23`
+* `ttft_ms_p50 = 955.4 ms`
+* `e2e_ms_p95 = 105,427.5 ms`
+
+From batch 32 to batch 48:
+
+* `reported_tok_s`: **-6.18%**
+* `preempted_seqs`: **7 → 23**
+* `ttft_ms_p50`: **+50.01%**
+
+### Interpretation / Revision
+
+The evidence supports the following mechanism:
+
+Increasing batch size reaches a KV-cache capacity boundary. At the last preemption-free point (batch 24), KV utilization is 0.93 and no sequences are preempted. Increasing to batch 32 raises utilization to 0.97 and introduces 7 preempted sequences while throughput falls and latency rises. Further increasing to batch 48 increases preemptions to 23 and throughput falls again.
+
+Therefore, the observed anomaly is associated with **KV-cache saturation followed by scheduler preemption and associated scheduling/capacity-management overhead**.
+
+The benchmark does not expose internal scheduler behavior, so no stronger claim about the exact implementation of preemption or recomputation is made.
+
+### Experiment 4 — Data-Derived Operating Point
+
+The analysis automatically identified the **largest preemption-free batch** as batch 24.
+
+Observed operating point:
+
+* batch 24
+* `reported_tok_s = 1607.4`
+* `kv_cache_util = 0.93`
+* `preempted_seqs = 0`
+
+Observed comparison with the first reversal row:
+
+`1384.0 → 1607.4 tok/s = +16.14%`
+
+Observed comparison with the largest tested batch:
+
+`1298.5 → 1607.4 tok/s = +23.79%`
+
+### Final Recommendation
+
+For the 3584-token prompt workload, use the largest observed preemption-free operating point as the concurrency cap:
+
+**batch 24 / equivalent `max_num_seqs = 24`**
+
+or use equivalent admission control that queues requests above this level rather than allowing the workload to enter the observed preempting regime.
+
+The quantitative effects above are data-derived predictions based on the measured operating points, not guarantees for unrelated production workloads.
+
+### Next Step
+
+B2 is complete after recording the evidence and recommendation.
+
+Proceed to B3, where the same `reported_tok_s` column must be interpreted carefully to determine why the v0 report concluded that longer prompts improve throughput and that batch 48 would reach approximately 3200 tok/s.
+
+## B3 — Corrected interpretation of REPORT_v0 Section 2
+
+### Question
+
+`REPORT_v0` Section 2 claims that longer prompts give better throughput and that batch 48 should deliver approximately 3200 tok/s.
+
+The task asks for the misread column, the honest goodput of the batch-24 long-prompt row using two independent derivations, and the corrected report conclusion.
+
+### Source evidence
+
+The relevant benchmark columns are:
+
+```text
+batch_size,prompt_len,gen_len,num_requests,wall_clock_s,reported_tok_s,...
+```
+
+For batch 24 with the long prompt:
+
+```text
+batch_size   = 24
+prompt_len   = 3584
+gen_len      = 512
+wall_clock_s = 61.16
+reported_tok_s = 1607.4
+```
+
+### Finding 1 — Misread column
+
+The misread column is:
+
+```text
+reported_tok_s
+```
+
+`model_spec.md` identifies this as the harness's built-in throughput counter.
+
+The batch-24 value can be reproduced as:
+
+```text
+24 × (3584 + 512) / 61.16
+= 1607.33 tok/s
+```
+
+which matches the logged 1607.4 tok/s.
+
+Therefore `reported_tok_s` already represents aggregate prompt-plus-generation token throughput for the workload. It must not be multiplied by batch size again.
+
+### Finding 2 — The long-vs-short comparison does not establish that longer prompts improve GPU utilization
+
+At batch 16:
+
+```text
+Long prompt:
+16 × (3584 + 512) / 49.97
+= 1311.5 tok/s
+```
+
+Logged value:
+
+```text
+1311.4 tok/s
+```
+
+Short prompt:
+
+```text
+16 × (512 + 256) / 13.91
+= 883.3 tok/s
+```
+
+Logged value:
+
+```text
+883.2 tok/s
+```
+
+The long workload contains 4096 tokens/request while the short workload contains 768 tokens/request. Therefore the higher aggregate token rate for the long workload does not, by itself, demonstrate that longer prompts improve GPU utilization.
+
+The complete long-prompt sweep shows:
+
+```text
+batch 4  = 565.4 tok/s
+batch 8  = 902.6 tok/s
+batch 16 = 1311.4 tok/s
+batch 24 = 1607.4 tok/s
+batch 32 = 1384.0 tok/s
+batch 48 = 1298.5 tok/s
+```
+
+Observed pattern:
+
+```text
+565.4 → 902.6 → 1311.4 → 1607.4 → 1384.0 → 1298.5 tok/s
+```
+
+Throughput peaks at batch 24 and then decreases.
+
+### Finding 3 — Honest batch-24 goodput
+
+For this analysis, goodput is useful generated output tokens per second.
+
+Method 1:
+
+```text
+24 × 512 = 12,288 generated tokens
+
+12,288 / 61.16
+= 200.92 generated tok/s
+```
+
+Method 2:
+
+```text
+24 / 61.16
+= 0.39241 requests/s
+
+0.39241 × 512
+= 200.92 generated tok/s
+```
+
+Both methods agree.
+
+```text
+Honest batch-24 goodput ≈ 201 generated tok/s
+```
+
+### Finding 4 — Batch-48 extrapolation is invalid
+
+`REPORT_v0` uses the approximately 1600 tok/s batch-24 value as though it were a per-L4 rate and then extrapolates to batch 48.
+
+The actual batch-48 log row reports:
+
+```text
+1298.5 tok/s
+```
+
+The corresponding generated-output goodput is:
+
+```text
+48 × 512 / 151.41
+= 162.31 generated tok/s
+```
+
+Therefore the approximately 3200 tok/s claim is not supported by the measurements.
+
+### B3 conclusion
+
+The report should have said that, for the tested long-prompt workload, aggregate prompt-plus-generation throughput increased with batch size up to batch 24 and then declined. Batch 24 was the highest observed aggregate throughput at 1607.4 tok/s. The honest generated-output goodput at that point was approximately 201 tok/s. The approximately 3200 tok/s batch-48 estimate was invalid because `reported_tok_s` was already an aggregate workload throughput and the actual batch-48 measurement was only 1298.5 tok/s.
+
+---
+
+## B4 — Serving metric to test the B2 mechanism
+
+### Question
+
+Choose one serving-stack counter or metric that would test the B2 mechanism and state the expected value.
+
+### Metric selected
+
+Use the scheduler's:
+
+```text
+KV-cache preemption counter
+```
+
+or equivalent count of sequences preempted by the serving scheduler.
+
+### Reason
+
+The B2 evidence indicates that the throughput reversal begins when KV-cache pressure becomes high and scheduler preemption appears.
+
+Observed benchmark transition:
+
+```text
+Batch 24:
+KV util = 0.93
+preempted sequences = 0
+throughput = 1607.4 tok/s
+
+Batch 32:
+KV util = 0.97
+preempted sequences = 7
+throughput = 1384.0 tok/s
+
+Batch 48:
+KV util = 0.97
+preempted sequences = 23
+throughput = 1298.5 tok/s
+```
+
+The expected operational signature is therefore:
+
+```text
+0 preemptions around batch 24
+→ non-zero preemptions at batch 32
+→ more preemptions at batch 48
+```
+
+The metric would strongly support the B2 mechanism if preemptions begin at the same concurrency where throughput reverses.
+
+### B4 conclusion
+
+The single most useful serving-stack metric is the scheduler's KV-cache preemption counter. Under the same workload, I would expect approximately 0 preemptions at batch 24, about 7 at batch 32, and about 23 at batch 48. This directly tests whether the scheduler begins preempting sequences at the same point where the observed throughput reversal occurs.

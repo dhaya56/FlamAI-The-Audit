@@ -1,0 +1,3 @@
+# B4 — Confirming the B2 Mechanism
+
+The single serving-stack metric I would pull is the **scheduler's KV-cache preemption counter** (or equivalent preemption count). The B2 hypothesis is that the workload reaches the KV-cache capacity boundary, after which the scheduler begins preempting sequences and incurs additional overhead. I would therefore expect the counter to remain **0 at batch 24**, then become non-zero at batch 32, with approximately **7 preempted sequences**, and increase further at batch 48 to approximately **23**, matching the benchmark's observed transition. Seeing preemptions begin at the same concurrency where throughput reverses would strongly support the proposed mechanism.
