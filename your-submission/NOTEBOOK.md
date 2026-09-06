@@ -1199,3 +1199,207 @@ The quantitative effects above are data-derived predictions based on the measure
 B2 is complete after recording the evidence and recommendation.
 
 Proceed to B3, where the same `reported_tok_s` column must be interpreted carefully to determine why the v0 report concluded that longer prompts improve throughput and that batch 48 would reach approximately 3200 tok/s.
+
+## B3 — Corrected interpretation of REPORT_v0 Section 2
+
+### Question
+
+`REPORT_v0` Section 2 claims that longer prompts give better throughput and that batch 48 should deliver approximately 3200 tok/s.
+
+The task asks for the misread column, the honest goodput of the batch-24 long-prompt row using two independent derivations, and the corrected report conclusion.
+
+### Source evidence
+
+The relevant benchmark columns are:
+
+```text
+batch_size,prompt_len,gen_len,num_requests,wall_clock_s,reported_tok_s,...
+```
+
+For batch 24 with the long prompt:
+
+```text
+batch_size   = 24
+prompt_len   = 3584
+gen_len      = 512
+wall_clock_s = 61.16
+reported_tok_s = 1607.4
+```
+
+### Finding 1 — Misread column
+
+The misread column is:
+
+```text
+reported_tok_s
+```
+
+`model_spec.md` identifies this as the harness's built-in throughput counter.
+
+The batch-24 value can be reproduced as:
+
+```text
+24 × (3584 + 512) / 61.16
+= 1607.33 tok/s
+```
+
+which matches the logged 1607.4 tok/s.
+
+Therefore `reported_tok_s` already represents aggregate prompt-plus-generation token throughput for the workload. It must not be multiplied by batch size again.
+
+### Finding 2 — The long-vs-short comparison does not establish that longer prompts improve GPU utilization
+
+At batch 16:
+
+```text
+Long prompt:
+16 × (3584 + 512) / 49.97
+= 1311.5 tok/s
+```
+
+Logged value:
+
+```text
+1311.4 tok/s
+```
+
+Short prompt:
+
+```text
+16 × (512 + 256) / 13.91
+= 883.3 tok/s
+```
+
+Logged value:
+
+```text
+883.2 tok/s
+```
+
+The long workload contains 4096 tokens/request while the short workload contains 768 tokens/request. Therefore the higher aggregate token rate for the long workload does not, by itself, demonstrate that longer prompts improve GPU utilization.
+
+The complete long-prompt sweep shows:
+
+```text
+batch 4  = 565.4 tok/s
+batch 8  = 902.6 tok/s
+batch 16 = 1311.4 tok/s
+batch 24 = 1607.4 tok/s
+batch 32 = 1384.0 tok/s
+batch 48 = 1298.5 tok/s
+```
+
+Observed pattern:
+
+```text
+565.4 → 902.6 → 1311.4 → 1607.4 → 1384.0 → 1298.5 tok/s
+```
+
+Throughput peaks at batch 24 and then decreases.
+
+### Finding 3 — Honest batch-24 goodput
+
+For this analysis, goodput is useful generated output tokens per second.
+
+Method 1:
+
+```text
+24 × 512 = 12,288 generated tokens
+
+12,288 / 61.16
+= 200.92 generated tok/s
+```
+
+Method 2:
+
+```text
+24 / 61.16
+= 0.39241 requests/s
+
+0.39241 × 512
+= 200.92 generated tok/s
+```
+
+Both methods agree.
+
+```text
+Honest batch-24 goodput ≈ 201 generated tok/s
+```
+
+### Finding 4 — Batch-48 extrapolation is invalid
+
+`REPORT_v0` uses the approximately 1600 tok/s batch-24 value as though it were a per-L4 rate and then extrapolates to batch 48.
+
+The actual batch-48 log row reports:
+
+```text
+1298.5 tok/s
+```
+
+The corresponding generated-output goodput is:
+
+```text
+48 × 512 / 151.41
+= 162.31 generated tok/s
+```
+
+Therefore the approximately 3200 tok/s claim is not supported by the measurements.
+
+### B3 conclusion
+
+The report should have said that, for the tested long-prompt workload, aggregate prompt-plus-generation throughput increased with batch size up to batch 24 and then declined. Batch 24 was the highest observed aggregate throughput at 1607.4 tok/s. The honest generated-output goodput at that point was approximately 201 tok/s. The approximately 3200 tok/s batch-48 estimate was invalid because `reported_tok_s` was already an aggregate workload throughput and the actual batch-48 measurement was only 1298.5 tok/s.
+
+---
+
+## B4 — Serving metric to test the B2 mechanism
+
+### Question
+
+Choose one serving-stack counter or metric that would test the B2 mechanism and state the expected value.
+
+### Metric selected
+
+Use the scheduler's:
+
+```text
+KV-cache preemption counter
+```
+
+or equivalent count of sequences preempted by the serving scheduler.
+
+### Reason
+
+The B2 evidence indicates that the throughput reversal begins when KV-cache pressure becomes high and scheduler preemption appears.
+
+Observed benchmark transition:
+
+```text
+Batch 24:
+KV util = 0.93
+preempted sequences = 0
+throughput = 1607.4 tok/s
+
+Batch 32:
+KV util = 0.97
+preempted sequences = 7
+throughput = 1384.0 tok/s
+
+Batch 48:
+KV util = 0.97
+preempted sequences = 23
+throughput = 1298.5 tok/s
+```
+
+The expected operational signature is therefore:
+
+```text
+0 preemptions around batch 24
+→ non-zero preemptions at batch 32
+→ more preemptions at batch 48
+```
+
+The metric would strongly support the B2 mechanism if preemptions begin at the same concurrency where throughput reverses.
+
+### B4 conclusion
+
+The single most useful serving-stack metric is the scheduler's KV-cache preemption counter. Under the same workload, I would expect approximately 0 preemptions at batch 24, about 7 at batch 32, and about 23 at batch 48. This directly tests whether the scheduler begins preempting sequences at the same point where the observed throughput reversal occurs.
