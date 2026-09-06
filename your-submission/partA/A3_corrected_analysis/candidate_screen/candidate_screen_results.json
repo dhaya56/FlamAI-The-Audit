@@ -1,0 +1,277 @@
+[
+  {
+    "candidate": "GPT-2",
+    "repo": "gpt2",
+    "vocab_size": 50257,
+    "results": {
+      "eng": {
+        "sentences": 100,
+        "tokens": 2796,
+        "words": 2221,
+        "graphemes": 13296,
+        "bytes": 13305,
+        "tok_per_sentence": 27.96,
+        "tok_per_word": 1.2588923908149483,
+        "tok_per_grapheme": 0.21028880866425992,
+        "tok_per_byte": 0.2101465614430665,
+        "token_ratio_vs_eng": 1.0
+      },
+      "hin": {
+        "sentences": 100,
+        "tokens": 20443,
+        "words": 2640,
+        "graphemes": 8867,
+        "bytes": 34507,
+        "tok_per_sentence": 204.43,
+        "tok_per_word": 7.743560606060606,
+        "tok_per_grapheme": 2.3055148302695385,
+        "tok_per_byte": 0.5924305213434955,
+        "token_ratio_vs_eng": 7.311516452074392
+      },
+      "kan": {
+        "sentences": 100,
+        "tokens": 36957,
+        "words": 1720,
+        "graphemes": 9219,
+        "bytes": 37841,
+        "tok_per_sentence": 369.57,
+        "tok_per_word": 21.486627906976743,
+        "tok_per_grapheme": 4.0087862024080705,
+        "tok_per_byte": 0.976639095161333,
+        "token_ratio_vs_eng": 13.217811158798284
+      },
+      "tam": {
+        "sentences": 100,
+        "tokens": 42141,
+        "words": 1751,
+        "graphemes": 10093,
+        "bytes": 42435,
+        "tok_per_sentence": 421.41,
+        "tok_per_word": 24.066818960593945,
+        "tok_per_grapheme": 4.175269989101357,
+        "tok_per_byte": 0.9930717568045245,
+        "token_ratio_vs_eng": 15.071888412017167
+      }
+    }
+  },
+  {
+    "candidate": "IndicBERTv2-SS",
+    "repo": "ai4bharat/IndicBERTv2-SS",
+    "vocab_size": 200000,
+    "results": {
+      "eng": {
+        "sentences": 100,
+        "tokens": 3026,
+        "words": 2221,
+        "graphemes": 13296,
+        "bytes": 13305,
+        "tok_per_sentence": 30.26,
+        "tok_per_word": 1.3624493471409276,
+        "tok_per_grapheme": 0.22758724428399518,
+        "tok_per_byte": 0.22743329575347615,
+        "token_ratio_vs_eng": 1.0
+      },
+      "hin": {
+        "sentences": 100,
+        "tokens": 3285,
+        "words": 2640,
+        "graphemes": 8867,
+        "bytes": 34507,
+        "tok_per_sentence": 32.85,
+        "tok_per_word": 1.2443181818181819,
+        "tok_per_grapheme": 0.3704747941806699,
+        "tok_per_byte": 0.09519807575274582,
+        "token_ratio_vs_eng": 1.0855915399867813
+      },
+      "kan": {
+        "sentences": 100,
+        "tokens": 10796,
+        "words": 1720,
+        "graphemes": 9219,
+        "bytes": 37841,
+        "tok_per_sentence": 107.96,
+        "tok_per_word": 6.276744186046511,
+        "tok_per_grapheme": 1.1710597678707018,
+        "tok_per_byte": 0.2852990142966623,
+        "token_ratio_vs_eng": 3.567746199603437
+      },
+      "tam": {
+        "sentences": 100,
+        "tokens": 13732,
+        "words": 1751,
+        "graphemes": 10093,
+        "bytes": 42435,
+        "tok_per_sentence": 137.32,
+        "tok_per_word": 7.8423757852655624,
+        "tok_per_grapheme": 1.360546913702566,
+        "tok_per_byte": 0.3236008012254036,
+        "token_ratio_vs_eng": 4.538003965631196
+      }
+    }
+  },
+  {
+    "candidate": "Sarvam-1",
+    "repo": "sarvamai/sarvam-1",
+    "vocab_size": 68096,
+    "results": {
+      "eng": {
+        "sentences": 100,
+        "tokens": 3379,
+        "words": 2221,
+        "graphemes": 13296,
+        "bytes": 13305,
+        "tok_per_sentence": 33.79,
+        "tok_per_word": 1.5213867627194957,
+        "tok_per_grapheme": 0.2541365824308063,
+        "tok_per_byte": 0.25396467493423525,
+        "token_ratio_vs_eng": 1.0
+      },
+      "hin": {
+        "sentences": 100,
+        "tokens": 3728,
+        "words": 2640,
+        "graphemes": 8867,
+        "bytes": 34507,
+        "tok_per_sentence": 37.28,
+        "tok_per_word": 1.412121212121212,
+        "tok_per_grapheme": 0.4204353219803767,
+        "tok_per_byte": 0.10803605065638856,
+        "token_ratio_vs_eng": 1.1032849955608168
+      },
+      "kan": {
+        "sentences": 100,
+        "tokens": 4217,
+        "words": 1720,
+        "graphemes": 9219,
+        "bytes": 37841,
+        "tok_per_sentence": 42.17,
+        "tok_per_word": 2.4517441860465117,
+        "tok_per_grapheme": 0.45742488339299275,
+        "tok_per_byte": 0.11143997251658254,
+        "token_ratio_vs_eng": 1.248002367564368
+      },
+      "tam": {
+        "sentences": 100,
+        "tokens": 3881,
+        "words": 1751,
+        "graphemes": 10093,
+        "bytes": 42435,
+        "tok_per_sentence": 38.81,
+        "tok_per_word": 2.216447744146202,
+        "tok_per_grapheme": 0.38452392747448727,
+        "tok_per_byte": 0.09145752327088488,
+        "token_ratio_vs_eng": 1.1485646641018052
+      }
+    }
+  },
+  {
+    "candidate": "Qwen2.5-7B",
+    "repo": "Qwen/Qwen2.5-7B",
+    "vocab_size": 151665,
+    "results": {
+      "eng": {
+        "sentences": 100,
+        "tokens": 2907,
+        "words": 2221,
+        "graphemes": 13296,
+        "bytes": 13305,
+        "tok_per_sentence": 29.07,
+        "tok_per_word": 1.3088698784331383,
+        "tok_per_grapheme": 0.21863718411552346,
+        "tok_per_byte": 0.21848928974069898,
+        "token_ratio_vs_eng": 1.0
+      },
+      "hin": {
+        "sentences": 100,
+        "tokens": 12496,
+        "words": 2640,
+        "graphemes": 8867,
+        "bytes": 34507,
+        "tok_per_sentence": 124.96,
+        "tok_per_word": 4.733333333333333,
+        "tok_per_grapheme": 1.409270328183151,
+        "tok_per_byte": 0.36212942301562,
+        "token_ratio_vs_eng": 4.29858961128311
+      },
+      "kan": {
+        "sentences": 100,
+        "tokens": 19465,
+        "words": 1720,
+        "graphemes": 9219,
+        "bytes": 37841,
+        "tok_per_sentence": 194.65,
+        "tok_per_word": 11.31686046511628,
+        "tok_per_grapheme": 2.111400368803558,
+        "tok_per_byte": 0.5143891546206496,
+        "token_ratio_vs_eng": 6.695906432748538
+      },
+      "tam": {
+        "sentences": 100,
+        "tokens": 17166,
+        "words": 1751,
+        "graphemes": 10093,
+        "bytes": 42435,
+        "tok_per_sentence": 171.66,
+        "tok_per_word": 9.803540833809253,
+        "tok_per_grapheme": 1.700782720697513,
+        "tok_per_byte": 0.40452456698480027,
+        "token_ratio_vs_eng": 5.905056759545924
+      }
+    }
+  },
+  {
+    "candidate": "XLM-R",
+    "repo": "FacebookAI/xlm-roberta-base",
+    "vocab_size": 250002,
+    "results": {
+      "eng": {
+        "sentences": 100,
+        "tokens": 3120,
+        "words": 2221,
+        "graphemes": 13296,
+        "bytes": 13305,
+        "tok_per_sentence": 31.2,
+        "tok_per_word": 1.4047726249437191,
+        "tok_per_grapheme": 0.23465703971119134,
+        "tok_per_byte": 0.23449830890642615,
+        "token_ratio_vs_eng": 1.0
+      },
+      "hin": {
+        "sentences": 100,
+        "tokens": 3989,
+        "words": 2640,
+        "graphemes": 8867,
+        "bytes": 34507,
+        "tok_per_sentence": 39.89,
+        "tok_per_word": 1.5109848484848485,
+        "tok_per_grapheme": 0.449870305627608,
+        "tok_per_byte": 0.11559973338742864,
+        "token_ratio_vs_eng": 1.278525641025641
+      },
+      "kan": {
+        "sentences": 100,
+        "tokens": 4310,
+        "words": 1720,
+        "graphemes": 9219,
+        "bytes": 37841,
+        "tok_per_sentence": 43.1,
+        "tok_per_word": 2.505813953488372,
+        "tok_per_grapheme": 0.46751274541707344,
+        "tok_per_byte": 0.11389762426997173,
+        "token_ratio_vs_eng": 1.3814102564102564
+      },
+      "tam": {
+        "sentences": 100,
+        "tokens": 4277,
+        "words": 1751,
+        "graphemes": 10093,
+        "bytes": 42435,
+        "tok_per_sentence": 42.77,
+        "tok_per_word": 2.442604226156482,
+        "tok_per_grapheme": 0.4237590409194491,
+        "tok_per_byte": 0.10078944267703546,
+        "token_ratio_vs_eng": 1.3708333333333333
+      }
+    }
+  }
+]
