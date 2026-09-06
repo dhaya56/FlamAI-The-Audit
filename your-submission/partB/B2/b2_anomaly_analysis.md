@@ -1,261 +1,200 @@
-# B2 — Long-Context Throughput Anomaly
+# B2 — Long-Prompt Throughput Anomaly
 
 ## Question
 
-The `prompt_len = 3584` sweep contains a throughput anomaly relative to the naive expectation that increasing batch size should continue increasing throughput.
-
-The task is to identify the anomaly, explain the mechanism using specific rows and columns, and propose one configuration or deployment change with a quantitative predicted effect.
-
----
+For the `prompt_len = 3584` sweep, identify the throughput anomaly, explain the mechanism using evidence from the benchmark log, and recommend one serving/deployment change with a quantitative effect.
 
 ## Experiment
 
-Command:
+Source log:
 
 ```text
-python your-submission\partB\B2\b2_mechanism_analysis.py
+starter_kit/bench/bench_log.csv
 ```
 
-The analysis filters the benchmark log to `prompt_len = 3584`, automatically detects throughput reversals, and compares the first reversal with the preceding and following rows.
+Command:
 
-For these rows:
+```bash
+python your-submission/partB/B2/b2_mechanism_analysis.py
+```
 
-$$
-3584+512=\boxed{4096\text{ tokens/request}}
-$$
+The script filters the long-context sweep:
 
----
+```text
+prompt_len = 3584
+gen_len    = 512
+```
 
-## 1. Identify the Throughput Anomaly
+Therefore every request contains:
 
-The measured `reported_tok_s` values are:
+```text
+3584 + 512 = 4096 tokens
+```
 
-| Batch | `reported_tok_s` |
-| ----: | ---------------: |
-|     4 |            565.4 |
-|     8 |            902.6 |
-|    16 |           1311.4 |
-|    24 |           1607.4 |
-|    32 |           1384.0 |
-|    48 |           1298.5 |
+The script also verifies that `reported_tok_s` is consistent with:
 
-Throughput increases through batch 24, then reverses.
+```text
+batch_size × 4096 / wall_clock_s
+```
 
-First reversal:
+The values match to rounding error, so `reported_tok_s` represents total prompt-plus-generation token throughput for the batch.
 
-$$
-1607.4\rightarrow1384.0\text{ tok/s}
-$$
+Example for batch 24:
+
+```text
+24 × 4096 / 61.16 = 1607.33 tok/s
+reported_tok_s   = 1607.40 tok/s
+```
+
+## Observed throughput
+
+| Batch | Wall clock (s) | Reported tok/s | KV util | Preempted seqs |
+| ----: | -------------: | -------------: | ------: | -------------: |
+|     4 |          28.98 |          565.4 |    0.16 |              0 |
+|     8 |          36.30 |          902.6 |    0.31 |              0 |
+|    16 |          49.97 |         1311.4 |    0.62 |              0 |
+|    24 |          61.16 |         1607.4 |    0.93 |              0 |
+|    32 |          94.71 |         1384.0 |    0.97 |              7 |
+|    48 |         151.41 |         1298.5 |    0.97 |             23 |
+
+### Throughput anomaly
+
+Throughput increases normally from batch 4 through batch 24:
+
+```text
+565.4 → 902.6 → 1311.4 → 1607.4 tok/s
+```
+
+The first reversal occurs when batch size increases from 24 to 32:
+
+```text
+1607.4 → 1384.0 tok/s
+```
 
 Percentage change:
 
-$$
-\frac{1384.0-1607.4}{1607.4}\times100
-=
-\boxed{-13.90\%}
-$$
+```text
+(1384.0 - 1607.4) / 1607.4 × 100
+= -13.90%
+```
 
 A second reversal occurs from batch 32 to 48:
 
-$$
-1384.0\rightarrow1298.5\text{ tok/s}
-=
-\boxed{-6.18\%}
-$$
+```text
+1384.0 → 1298.5 tok/s
+```
 
-Therefore the anomaly is that increasing batch size beyond 24 **reduces** the measured `reported_tok_s` instead of increasing it.
+Percentage change:
 
----
+```text
+(1298.5 - 1384.0) / 1384.0 × 100
+= -6.18%
+```
 
-## 2. What Does `reported_tok_s` Measure?
-
-The log can be checked independently using:
-
-$$
-\text{derived rate}
-=
-\frac{\text{batch size}\times(\text{prompt length}+\text{generation length})}
-{\text{wall-clock time}}
-$$
-
-For example, for batch 24:
-
-$$
-\frac{24\times(3584+512)}{61.16}
-=
-1607.33\text{ tok/s}
-$$
-
-while the log reports:
-
-$$
-1607.4\text{ tok/s}
-$$
-
-The same close agreement occurs for every row in the sweep.
-
-Therefore, in this benchmark:
-
-> `reported_tok_s` is effectively measuring **prompt + generated tokens processed per wall-clock second**.
-
-It should not be interpreted as generated-token-only goodput.
+So increasing concurrency beyond batch 24 reduces total throughput instead of increasing it.
 
 ---
 
-## 3. Mechanism Evidence
+## Mechanism evidence
 
-The first throughput reversal occurs between batch 24 and batch 32.
+The strongest evidence appears at the first reversal, batch 24 to batch 32.
 
-### Batch 24 — last preemption-free point
+| Metric               |     Batch 24 |     Batch 32 |  Change |
+| -------------------- | -----------: | -----------: | ------: |
+| Reported throughput  | 1607.4 tok/s | 1384.0 tok/s | -13.90% |
+| KV-cache utilization |         0.93 |         0.97 |  +4.30% |
+| Preempted sequences  |            0 |            7 |      +7 |
+| TTFT p50             |     500.5 ms |     636.9 ms | +27.25% |
+| ITL p50              |     96.07 ms |    101.79 ms |  +5.95% |
+| E2E p95              |  69,221.3 ms |  97,465.7 ms | +40.80% |
 
-* `reported_tok_s` = **1607.4**
-* `kv_cache_util` = **0.93**
-* `preempted_seqs` = **0**
-* `ttft_ms_p50` = **500.5 ms**
-* `itl_ms_p50` = **96.07 ms**
-* `e2e_ms_p95` = **69,221.3 ms**
+The important transition is:
 
-### Batch 32 — first reversal
+```text
+batch 24:
+KV util = 0.93
+preempted = 0
+throughput = 1607.4 tok/s
+```
 
-* `reported_tok_s` = **1384.0**
-* `kv_cache_util` = **0.97**
-* `preempted_seqs` = **7**
-* `ttft_ms_p50` = **636.9 ms**
-* `itl_ms_p50` = **101.79 ms**
-* `e2e_ms_p95` = **97,465.7 ms**
+to:
 
-Changes from batch 24 to batch 32:
+```text
+batch 32:
+KV util = 0.97
+preempted = 7
+throughput = 1384.0 tok/s
+```
 
-$$
-\text{reported\_tok\_s}:1607.4\rightarrow1384.0
-$$
+This is consistent with the system reaching a KV-cache capacity boundary. Once the operating point moves past the last preemption-free batch, preemption begins and throughput falls while latency rises.
 
-$$
-\boxed{-13.90\%}
-$$
+The larger batch 48 reinforces the same interpretation:
 
-$$
-\text{kv\_cache\_util}:0.93\rightarrow0.97
-$$
+| Metric               |     Batch 32 |     Batch 48 |  Change |
+| -------------------- | -----------: | -----------: | ------: |
+| Reported throughput  | 1384.0 tok/s | 1298.5 tok/s |  -6.18% |
+| KV-cache utilization |         0.97 |         0.97 |   0.00% |
+| Preempted sequences  |            7 |           23 |     +16 |
+| TTFT p50             |     636.9 ms |     955.4 ms | +50.01% |
+| ITL p50              |    101.79 ms |    100.00 ms |  -1.76% |
+| E2E p95              |  97,465.7 ms | 105,427.5 ms |  +8.17% |
 
-$$
-\boxed{+4.30\%\text{ relative}}
-$$
+The log directly shows increasing preemptions and worsening latency as concurrency is pushed beyond the efficient operating region.
 
-$$
-\text{preempted\_seqs}:0\rightarrow7
-$$
-
-$$
-\boxed{+7\text{ sequences}}
-$$
-
-The percentage change for preemptions is undefined because the baseline is zero.
-
-Latency also worsens:
-
-$$
-500.5\rightarrow636.9\text{ ms}
-=
-\boxed{+27.25\%\text{ TTFT}}
-$$
-
-and:
-
-$$
-69,221.3\rightarrow97,465.7\text{ ms}
-=
-\boxed{+40.80\%\text{ p95 E2E}}
-$$
-
-The next row shows that the deterioration continues after preemption begins:
-
-| Metric           |    Batch 32 |     Batch 48 |      Change |
-| ---------------- | ----------: | -----------: | ----------: |
-| `reported_tok_s` |      1384.0 |       1298.5 |  **−6.18%** |
-| `kv_cache_util`  |        0.97 |         0.97 |       0.00% |
-| `preempted_seqs` |           7 |           23 |     **+16** |
-| `ttft_ms_p50`    |    636.9 ms |     955.4 ms | **+50.01%** |
-| `e2e_ms_p95`     | 97,465.7 ms | 105,427.5 ms |  **+8.17%** |
-
-### Mechanism
-
-The evidence indicates that the throughput reversal begins when the workload reaches the KV-cache capacity boundary:
-
-> **At batch 24, the workload remains preemption-free at 0.93 KV utilization. Increasing to batch 32 raises utilization to 0.97 and introduces 7 preempted sequences, while measured throughput falls and latency rises. Further increasing to batch 48 increases preemptions to 23 while throughput falls again.**
-
-Therefore, the observed mechanism is **KV-cache saturation followed by scheduler preemption and associated scheduling/capacity-management overhead**, which prevents further useful throughput scaling.
-
-This conclusion is based on the coincident changes in `kv_cache_util`, `preempted_seqs`, throughput, and latency. The log does not expose the scheduler's internal implementation, so no stronger claim about the exact internal preemption/recomputation process is made.
+The log does **not** prove the exact internal scheduler implementation or whether preemption causes a specific kind of recomputation. Therefore the defensible conclusion is that KV-cache saturation and resulting preemption/capacity-management overhead explain the observed throughput reversal.
 
 ---
 
-## 4. Configuration / Deployment Change
+## Recommended configuration change
 
-### Recommendation
+Use the largest observed preemption-free operating point as the concurrency cap:
 
-Set the maximum concurrent sequences for this 3584-token prompt workload to the **largest observed preemption-free operating point: batch 24**.
+```text
+batch size / max concurrent sequences = 24
+```
 
-Operationally, this can be implemented as:
+For a serving system exposing a parameter such as `max_num_seqs`, set:
 
-* `max_num_seqs = 24`, or
-* equivalent admission control that queues requests above 24 rather than admitting them into a preempting batch.
+```text
+max_num_seqs = 24
+```
 
-### Quantitative Prediction
+or use equivalent admission control to prevent the workload from routinely entering the batch-32+ regime.
 
-The measured preemption-free operating point is:
+### Quantitative effect observed in this benchmark
 
-$$
-\boxed{1607.4\text{ reported tok/s at batch 24}}
-$$
+Compared with batch 32:
 
-Relative to the first reversal row:
+```text
+1607.4 / 1384.0 - 1 = +16.14%
+```
 
-$$
-\frac{1607.4-1384.0}{1384.0}\times100
-=
-\boxed{+16.14\%}
-$$
+So operating at batch 24 gives approximately:
 
-Relative to the largest tested batch:
+```text
++16.14% higher observed throughput
+```
 
-$$
-\frac{1607.4-1298.5}{1298.5}\times100
-=
-\boxed{+23.79\%}
-$$
+than the first overloaded point.
 
-Therefore, under the same 3584+512-token workload, keeping operation at the observed preemption-free batch-24 point is predicted to restore measured processed-token throughput by approximately **16.14% versus batch 32** or **23.79% versus batch 48**.
+Compared with batch 48:
 
-These are **data-derived predictions from the observed benchmark operating points**, not guarantees of the same improvement under different production workloads.
+```text
+1607.4 / 1298.5 - 1 = +23.79%
+```
 
-### Trade-off
+So the same operating point gives approximately:
 
-The cap reduces maximum admitted concurrency. Requests beyond the cap must wait or be queued instead of causing KV-cache pressure and preemption.
+```text
++23.79% higher observed throughput
+```
 
-The goal is therefore not maximum batch size; it is maximum **useful, preemption-free throughput**.
+than the largest tested batch.
+
+These are measured differences under this benchmark workload, not guarantees for every production workload.
 
 ---
 
-## Conclusion
+## Final conclusion
 
-The long-context sweep shows a clear throughput reversal at batch 24 → 32:
-
-$$
-1607.4\rightarrow1384.0
-=
-\boxed{-13.90\%}
-$$
-
-The reversal coincides with:
-
-* KV utilization increasing from **0.93 to 0.97**
-* preemptions appearing (**0 → 7**)
-* TTFT increasing **27.25%**
-* p95 E2E latency increasing **40.80%**
-
-At batch 48, preemptions rise further to **23** and throughput falls again to **1298.5 tok/s**.
-
-The evidence supports **KV-cache saturation and scheduler preemption** as the mechanism preventing further batch scaling.
-
-The recommended operating point is therefore **batch 24 / `max_num_seqs=24` for this workload**, with an observed throughput advantage of **16.14% versus batch 32** and **23.79% versus batch 48**.
+The long-context sweep shows a clear throughput reversal after batch 24. Batch 24 is the last tested point with zero preemptions and 0.93 KV-cache utilization. Increasing to batch 32 raises utilization to 0.97, introduces 7 preempted sequences, increases TTFT by 27.25% and E2E p95 by 40.80%, while reducing throughput by 13.90%. Batch 48 causes even more preemptions and lower throughput. The evidence supports KV-cache saturation followed by preemption and capacity-management overhead as the mechanism. The recommended deployment change is to cap concurrency at 24 sequences; in this benchmark that corresponds to 16.14% higher throughput than batch 32 and 23.79% higher throughput than batch 48.
