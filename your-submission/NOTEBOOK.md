@@ -921,6 +921,116 @@ This directly tests whether live traffic follows the token-workload assumptions 
 
 Part A is complete after the A4 memo is committed. Merge the completed Part-A branch into `main` before beginning Part B.
 
+## B1 — KV-Cache Capacity Reconciliation
 
+### Hypothesis
 
+From the model specification alone, derive the KV-cache footprint per token and estimate how many complete 4096-token sequences the GPU can hold. Only after making that prediction, compare it with the benchmark log.
 
+### Experiment
+
+Created:
+
+`your-submission/partB/B1/b1_capacity_reconciliation.py`
+
+and:
+
+`your-submission/partB/B1/b1_capacity_reconciliation.md`
+
+Command:
+
+`python your-submission\partB\B1\b1_capacity_reconciliation.py`
+
+The calculation explicitly separates:
+
+1. Prediction from model specification alone
+2. Check against `bench_log.csv`
+3. Reconciled calculation
+
+The supplied `24 GB` GPU memory and `1.6 GB` non-KV overhead are treated as decimal GB (`1 GB = 10^9 bytes`) throughout the capacity calculation.
+
+### Stage 1 — Prediction from Model Spec Alone
+
+KV-cache bytes per token:
+
+`2(K,V) × 28 layers × 8 KV heads × 128 head_dim × 2 bytes(fp16) = 114,688 bytes/token`
+
+This is:
+
+`114,688 / 1024 = 112 KiB/token`
+
+One complete 4096-token sequence therefore requires:
+
+`114,688 × 4096 = 469,762,048 bytes = 448 MiB`
+
+Using the configured GPU budget:
+
+`24 GB × 0.92 = 22.08 GB`
+
+and subtracting only the stated non-KV overhead in the first pass:
+
+`22.08 − 1.6 = 20.48 GB`
+
+Initial capacity hypothesis:
+
+`20,480,000,000 / 469,762,048 = 43.597 sequences`
+
+Therefore the initial model-spec-only hypothesis was approximately **43.60 sequences**.
+
+### Stage 2 — Check Against Benchmark Log
+
+The relevant capacity-stress rows have:
+
+`prompt_len + gen_len = 3584 + 512 = 4096`
+
+Observed results:
+
+* Batch 24: `preempted_seqs = 0`, `kv_cache_util = 0.93`
+* Batch 32: `preempted_seqs = 7`, `kv_cache_util = 0.97`
+* Batch 48: `preempted_seqs = 23`, `kv_cache_util = 0.97`
+
+Inferred resident-sequence counts:
+
+`32 − 7 = 25`
+
+`48 − 23 = 25`
+
+The initial ~43.60 prediction therefore does not match the observed capacity behavior.
+
+### Stage 3 — Reconciled Calculation
+
+The missing allocation in the initial calculation was model-weight memory.
+
+For the 4.2B-parameter fp16 model:
+
+`4.2 × 10^9 × 2 = 8.4 × 10^9 bytes = 8.4 GB`
+
+Correct KV budget:
+
+`22.08 − 8.4 − 1.6 = 12.08 GB`
+
+Corrected capacity:
+
+`12,080,000,000 / 469,762,048 = 25.715 sequences`
+
+Therefore the reconciled capacity is approximately **25 concurrent 4096-token sequences**.
+
+This agrees with both capacity-stress rows:
+
+`32 − 7 = 25`
+
+`48 − 23 = 25`
+
+The reported KV utilization is also consistent: scaling the 24-sequence utilization gives approximately `0.93 × 25/24 = 0.969`, matching the observed `0.97`.
+
+### Interpretation
+
+The first-pass ~43.60-sequence result was a genuine incomplete memory-budget calculation because model weights had not been reserved.
+
+After accounting for model weights and the stated non-KV overhead, the model-spec prediction becomes approximately 25 sequences, which is independently supported by the benchmark log.
+
+### Revision / Next Step
+
+B1 capacity reconciliation is complete.
+
+Proceed to B2 using the long-context throughput rows, with particular attention to the relationship between `reported_tok_s`, `wall_clock_s`, `batch_size`, and the 3584-token prompt configuration.
