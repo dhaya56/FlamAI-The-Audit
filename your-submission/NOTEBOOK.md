@@ -1403,3 +1403,444 @@ The metric would strongly support the B2 mechanism if preemptions begin at the s
 ### B4 conclusion
 
 The single most useful serving-stack metric is the scheduler's KV-cache preemption counter. Under the same workload, I would expect approximately 0 preemptions at batch 24, about 7 at batch 32, and about 23 at batch 48. This directly tests whether the scheduler begins preempting sequences at the same point where the observed throughput reversal occurs.
+
+## Part C — Decision Memo: Conversational Register
+
+### Part C scope
+
+The Part C task is a decision-memo problem rather than an empirical benchmark task. I therefore did not claim to have measured production quality, A100 throughput, reviewer speed, or model latency when those values were not supplied. The notebook records the decision analysis, assumptions considered, external-review feedback, arithmetic, rejected approaches, and the final recommendation.
+
+---
+
+### C0 — Initial framing
+
+**Hypothesis**
+
+One of the three listed paths should be selected as the best way to make responses more casual and conversational:
+
+* (a) SFT on synthetic casualized pairs
+* (b) ≤1B inference-time rewriter
+* (c) prompt engineering only
+
+**Initial reasoning**
+
+The first instinct was that prompt engineering might be preferable because it is reversible and does not require training.
+
+**Risk identified**
+
+This was only an intuition. The scenario does not provide evidence that prompt engineering is sufficiently effective across all six languages.
+
+**Revision**
+
+Do not choose A, B, or C solely from generic claims about the techniques. Compare them under the actual resource constraints and explicitly identify what must be assumed.
+
+---
+
+### C1 — Constraint audit
+
+**Given constraints**
+
+```text
+Target languages:
+Hindi, Kannada, Tamil, Telugu, Bengali, Marathi
+
+Compute:
+1 × A100-80GB for 2 weeks
+
+Human review:
+1 native-speaker reviewer
+Hindi + Kannada only
+10 h/week
+
+Timeline:
+launch review in 3 weeks
+
+External APIs:
+$0 budget
+```
+
+**Observation**
+
+The reviewer is a deliberately specified scarce resource. Native-speaker review is available only for 2 of the 6 languages, so any strategy that changes model behavior globally creates a validation gap for four languages.
+
+**Revision**
+
+Use the reviewer as a decision resource across methods rather than associating the reviewer with only one path.
+
+---
+
+### C2 — First external review: Gemini
+
+**Hypothesis challenged**
+
+Prompt engineering is likely sufficient under the constraints.
+
+**Gemini Round 1 result**
+
+Recommended path (c) prompt engineering, mainly because it is reversible, requires no training, and avoids synthetic-data risks.
+
+**Issues identified in review**
+
+Several numerical claims were not grounded in the scenario, including assumed 27B–70B local inference throughput, rewriter latency, reviewer speed, and synthetic-data requirements. These values were treated as assumptions but were presented too confidently.
+
+**Revision**
+
+Do not use external numerical claims as facts. Every number in the final memo must be either:
+
+1. given by the scenario,
+2. explicitly labelled as an assumption, or
+3. derived from those values.
+
+---
+
+### C3 — Second external review: Claude Round 1
+
+**Independent result**
+
+Claude recommended path (b), but only conditionally: test prompt engineering first, then use the rewriter if prompting is inadequate.
+
+**Important finding**
+
+Claude identified that committing to prompt engineering without testing it is itself an unsupported claim. It also highlighted semantic drift as the key risk for a ≤1B rewriter.
+
+**Revision**
+
+The decision should not be framed as “C is best” or “B is best” before considering evidence. A staged strategy is a valid candidate.
+
+---
+
+### C4 — External-review adversarial pass
+
+**Action**
+
+Both Gemini and Claude were given an adversarial analysis request requiring them to:
+
+* separate facts from assumptions,
+* identify hidden weaknesses of A/B/C,
+* identify quantities that must be estimated,
+* avoid unsupported GPU-throughput claims,
+* propose Day-1 experiments.
+
+**Finding**
+
+Both analyses converged on the same structural issue: all three paths depend on the ability to produce sufficiently good casual, faithful behavior across six languages, while only Hindi and Kannada have native-speaker validation.
+
+**Important disagreement with earlier reasoning**
+
+The low cost of prompt engineering does not by itself make it the best first decision. The relevant question is information gained and probability of meeting the product requirement under the resource limits.
+
+**Revision**
+
+Evaluate combinations and staged strategies rather than assuming A/B/C are mutually exclusive final choices.
+
+---
+
+### C5 — Hybrid strategy considered
+
+**Hypothesis**
+
+A language-conditional strategy may be better than forcing one intervention across all six languages:
+
+```text
+Prompt engineering
+        ↓
+language meets quality gate?
+   YES → retain prompt-only
+   NO  → add ≤1B rewriter
+        ↓
+still fails → consider SFT
+```
+
+**Reasoning**
+
+This allows:
+
+* prompt-only deployment where it is sufficient,
+* stronger intervention only where needed,
+* no unnecessary serving component for languages that already pass,
+* SFT reserved for cases where lighter interventions fail.
+
+**Risk**
+
+The language split must not be chosen arbitrarily. For example, selecting Hindi or English for the rewriter before observing evidence would be an unsupported assumption.
+
+**Revision**
+
+The final strategy should be **language-conditional**, with the allocation determined by the predefined quality gate.
+
+---
+
+### C6 — “Test all three” idea evaluated
+
+**Hypothesis**
+
+Because there is no single prescribed correct path, it may be useful to compare all three approaches rather than committing immediately.
+
+**Finding**
+
+A full implementation of all three would unnecessarily consume engineering and GPU resources. However, small decision-oriented pilots can compare the approaches without fully deploying them.
+
+**Revision**
+
+Do not fully train or deploy all three on Day 1. Use a small controlled comparison to determine whether additional complexity is justified.
+
+---
+
+### C7 — SFT-first hypothesis rejected
+
+**Hypothesis considered**
+
+Use the available A100 to perform SFT immediately because the compute constraint appears feasible.
+
+**Finding**
+
+The principal objection is not raw GPU availability. SFT has the largest validation burden because it changes shared model weights, requires high-quality casual targets, and can create regressions in the four languages without native review.
+
+The lack of an external API budget also means that synthetic casual targets must be generated or curated locally.
+
+**Revision**
+
+Do not start with SFT. Reserve SFT as a fallback only after lighter interventions fail and a small SFT pilot demonstrates a clear gain.
+
+---
+
+### C8 — Part B model information explicitly excluded
+
+**Potential contamination identified**
+
+Part B contains a concrete model specification and serving benchmark. It would be tempting to reuse those values for Part C.
+
+**Finding**
+
+Part C is a separate scenario and does not specify that it uses the Part B model or serving stack.
+
+**Revision**
+
+Do not use Part B model size, L4 results, KV-cache arithmetic, or serving measurements as evidence for Part C. Any Part C compute estimate must be based only on Part C's stated constraints and clearly labelled assumptions.
+
+---
+
+### C9 — Quantitative planning
+
+**Reviewer capacity**
+
+Given:
+
+```text
+10 h/week × 3 weeks = 30 reviewer-hours
+```
+
+Planning assumption:
+
+```text
+2 min/response = 30 responses/hour
+```
+
+Therefore:
+
+```text
+30 × 30 = 900 response evaluations
+```
+
+Initial blind comparison:
+
+```text
+30 prompts
+× 2 native-reviewed languages
+× 3 conditions
+= 180 response evaluations
+```
+
+Reviewer time:
+
+```text
+180 × 2 min
+= 360 min
+= 6 h
+```
+
+Remaining reviewer capacity:
+
+```text
+30 - 6 = 24 h
+24 × 30 = 720 further evaluations
+```
+
+**Data planning assumption for rewriter**
+
+```text
+500 usable formal→casual pairs/language
+× 6 languages
+= 3,000 usable pairs
+```
+
+Assuming 200 source+target tokens/pair:
+
+```text
+3,000 × 200 = 600,000 tokens/epoch
+```
+
+At 3 epochs:
+
+```text
+600,000 × 3 = 1.8M token presentations
+```
+
+These are planning assumptions, not experimentally established minimum requirements.
+
+**GPU-budget planning**
+
+Assuming continuous A100 availability:
+
+```text
+14 × 24 = 336 GPU-hours
+```
+
+Because Part C provides no model architecture or measured training throughput, an exact training-hour number would be false precision.
+
+Therefore:
+
+```text
+25% of 336 GPU-hours = 84 GPU-hours
+```
+
+was selected as a planning ceiling for an initial training commitment, with the remaining compute reserved for iteration and validation.
+
+**Revision**
+
+Use formulas and explicit assumptions rather than inventing exact A100 training times.
+
+---
+
+### C10 — Success metric selected
+
+**Candidate metrics considered**
+
+* casualness score
+* 1–5 Likert rating
+* pairwise preference
+* casual + faithful binary pass
+
+**Decision**
+
+Use:
+
+```text
+PASS = casual AND faithful
+```
+
+Primary metric:
+
+```text
+casual-and-faithful pass rate
+= PASS responses / reviewed responses
+```
+
+Chosen launch threshold:
+
+```text
+≥75% pass rate
+```
+
+The threshold is a predeclared decision rule, not an assignment-provided fact.
+
+For the rewriter to justify its additional serving complexity:
+
+```text
+≥75% pass rate
+AND
+≥10 percentage-point improvement over prompt-only
+```
+
+---
+
+### C11 — Day-1 experiment defined
+
+**Objective**
+
+Determine whether prompt engineering is sufficient and whether the additional complexity of a ≤1B rewriter is justified.
+
+**Controlled inputs**
+
+Use the same 30 prompts across all six languages.
+
+**Conditions**
+
+```text
+C0 = current/default prompting
+
+C1 = improved casual-register prompting
+
+B  = C1 output followed by the ≤1B rewriter
+```
+
+**Human validation**
+
+Hindi and Kannada receive blind native-speaker evaluation for:
+
+```text
+casual?
+faithful?
+PASS?
+```
+
+**Other four languages**
+
+Tamil, Telugu, Bengali and Marathi receive structural/semantic sanity checks, explicitly marked as lower-confidence because native-speaker validation is unavailable.
+
+**Revision**
+
+Do not claim that the Day-1 experiment proves all six languages are correct. It is a decision gate for allocating additional resources.
+
+---
+
+### C12 — Kill criterion defined
+
+**Problem with initial proposal**
+
+An earlier idea used a fixed Day-8 cutoff. This was rejected because the assignment provides a two-week compute window and a three-week launch review, so the criterion should align with the resource boundary.
+
+**Final rule**
+
+By the end of Week 2:
+
+```text
+abandon B for a language if:
+1. best tested configuration <75% casual-and-faithful pass rate
+OR
+2. B improves over prompt-only by <10 percentage points
+```
+
+If the rewriter does not justify its added complexity, fall back to prompt-only.
+
+SFT is considered only if a prior SFT pilot has already demonstrated a clear quality gain and sufficient validation time remains.
+
+---
+
+### C13 — Final recommendation
+
+**Conclusion**
+
+Recommend:
+
+```text
+Prompt engineering across all six languages
++
+selective ≤1B rewriter only where the prompt-only configuration
+fails the predefined quality gate
++
+SFT reserved as a fallback
+```
+
+**Why this strategy**
+
+* It does not assume one technique is universally best.
+* It uses the reviewer where native validation is available.
+* It avoids unnecessary rewriter serving cost for languages that already pass.
+* It avoids immediately modifying shared model weights before establishing that a weight-level intervention is necessary.
+* It preserves the ability to escalate if prompt-only output is inadequate.
+* It keeps the decision tied to explicit quality and resource thresholds rather than intuition.
+
+**Final status**
+
+Part C memo completed using only the Part C scenario, explicit assumptions, and derived planning arithmetic. No Part B model or serving measurements were used.
