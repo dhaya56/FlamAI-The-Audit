@@ -1034,3 +1034,168 @@ After accounting for model weights and the stated non-KV overhead, the model-spe
 B1 capacity reconciliation is complete.
 
 Proceed to B2 using the long-context throughput rows, with particular attention to the relationship between `reported_tok_s`, `wall_clock_s`, `batch_size`, and the 3584-token prompt configuration.
+
+## B2 — Long-Context Throughput Anomaly
+
+### Initial Hypothesis
+
+The `prompt_len = 3584` long-context sweep should show increasing `reported_tok_s` as batch size increases, until some capacity or serving constraint causes the scaling behavior to break.
+
+The first analysis should identify any reversal from the data rather than assuming the location or cause of the anomaly.
+
+### Experiment 1 — Long-Context Sweep Inspection
+
+Created:
+
+`your-submission/partB/B2/b2_anomaly_analysis.py`
+
+Command:
+
+`python your-submission\partB\B2\b2_anomaly_analysis.py`
+
+Filtered the benchmark log to `prompt_len = 3584`.
+
+Observed `reported_tok_s`:
+
+* Batch 4: 565.4
+* Batch 8: 902.6
+* Batch 16: 1311.4
+* Batch 24: 1607.4
+* Batch 32: 1384.0
+* Batch 48: 1298.5
+
+The first throughput reversal is batch 24 → 32:
+
+`1607.4 → 1384.0 tok/s`
+
+which is a **13.90% decrease** despite the larger batch.
+
+A second reversal occurs from batch 32 → 48:
+
+`1384.0 → 1298.5 tok/s`
+
+which is a **6.18% decrease**.
+
+### Revision — Avoid Hard-Coded Conclusions
+
+The initial analysis script contained a hard-coded statement identifying the anomaly.
+
+That was revised because the experiment should **discover the throughput reversal from the benchmark data**, not be given the conclusion in advance.
+
+The script was changed to detect a reversal whenever a larger batch has lower `reported_tok_s` than the preceding batch.
+
+The revised script automatically identified:
+
+* first reversal: batch 24 → 32
+* second reversal: batch 32 → 48
+
+### Experiment 2 — Verify What `reported_tok_s` Measures
+
+The same B2 script independently reconstructed the reported throughput using:
+
+`batch_size × (prompt_len + gen_len) / wall_clock_s`
+
+For example, batch 24:
+
+`(24 × (3584 + 512)) / 61.16 = 1607.33 tok/s`
+
+reported value:
+
+`1607.4 tok/s`
+
+Similar agreement was observed for every row in the 3584-prompt sweep.
+
+Interpretation:
+
+`reported_tok_s` is effectively counting **prompt + generated tokens per wall-clock second**.
+
+This changed the interpretation of the throughput column: it should not be described as generated-token-only throughput or as goodput.
+
+### Experiment 3 — Mechanism Evidence
+
+The first reversal was examined by comparing the automatically selected pre-reversal and reversal rows.
+
+Batch 24:
+
+* `reported_tok_s = 1607.4`
+* `kv_cache_util = 0.93`
+* `preempted_seqs = 0`
+* `ttft_ms_p50 = 500.5 ms`
+* `e2e_ms_p95 = 69,221.3 ms`
+
+Batch 32:
+
+* `reported_tok_s = 1384.0`
+* `kv_cache_util = 0.97`
+* `preempted_seqs = 7`
+* `ttft_ms_p50 = 636.9 ms`
+* `e2e_ms_p95 = 97,465.7 ms`
+
+Changes from batch 24 to batch 32:
+
+* `reported_tok_s`: **-13.90%**
+* `kv_cache_util`: **0.93 → 0.97**
+* `preempted_seqs`: **0 → 7**
+* `ttft_ms_p50`: **+27.25%**
+* `e2e_ms_p95`: **+40.80%**
+
+The next row shows the deterioration continuing:
+
+Batch 48:
+
+* `reported_tok_s = 1298.5`
+* `kv_cache_util = 0.97`
+* `preempted_seqs = 23`
+* `ttft_ms_p50 = 955.4 ms`
+* `e2e_ms_p95 = 105,427.5 ms`
+
+From batch 32 to batch 48:
+
+* `reported_tok_s`: **-6.18%**
+* `preempted_seqs`: **7 → 23**
+* `ttft_ms_p50`: **+50.01%**
+
+### Interpretation / Revision
+
+The evidence supports the following mechanism:
+
+Increasing batch size reaches a KV-cache capacity boundary. At the last preemption-free point (batch 24), KV utilization is 0.93 and no sequences are preempted. Increasing to batch 32 raises utilization to 0.97 and introduces 7 preempted sequences while throughput falls and latency rises. Further increasing to batch 48 increases preemptions to 23 and throughput falls again.
+
+Therefore, the observed anomaly is associated with **KV-cache saturation followed by scheduler preemption and associated scheduling/capacity-management overhead**.
+
+The benchmark does not expose internal scheduler behavior, so no stronger claim about the exact implementation of preemption or recomputation is made.
+
+### Experiment 4 — Data-Derived Operating Point
+
+The analysis automatically identified the **largest preemption-free batch** as batch 24.
+
+Observed operating point:
+
+* batch 24
+* `reported_tok_s = 1607.4`
+* `kv_cache_util = 0.93`
+* `preempted_seqs = 0`
+
+Observed comparison with the first reversal row:
+
+`1384.0 → 1607.4 tok/s = +16.14%`
+
+Observed comparison with the largest tested batch:
+
+`1298.5 → 1607.4 tok/s = +23.79%`
+
+### Final Recommendation
+
+For the 3584-token prompt workload, use the largest observed preemption-free operating point as the concurrency cap:
+
+**batch 24 / equivalent `max_num_seqs = 24`**
+
+or use equivalent admission control that queues requests above this level rather than allowing the workload to enter the observed preempting regime.
+
+The quantitative effects above are data-derived predictions based on the measured operating points, not guarantees for unrelated production workloads.
+
+### Next Step
+
+B2 is complete after recording the evidence and recommendation.
+
+Proceed to B3, where the same `reported_tok_s` column must be interpreted carefully to determine why the v0 report concluded that longer prompts improve throughput and that batch 48 would reach approximately 3200 tok/s.
